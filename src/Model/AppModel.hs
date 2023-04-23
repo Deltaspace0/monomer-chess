@@ -5,8 +5,6 @@
 module Model.AppModel
     ( module Model.Piece
     , AppModel(..)
-    , boardRows
-    , boardCols
     , boardState
     , initBoardState
     , allPawns
@@ -22,9 +20,7 @@ import Monomer
 import Model.Piece
 
 data AppModel = AppModel
-    { _amBoardRows :: Int
-    , _amBoardCols :: Int
-    , _amBoardState :: [[Piece]]
+    { _amBoardState :: [[Piece]]
     , _amInitBoardState :: [[Piece]]
     , _amAllPawns :: Bool
     } deriving (Eq, Show)
@@ -32,7 +28,7 @@ data AppModel = AppModel
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
-initModel = AppModel 8 8 initBoard initBoard False where
+initModel = AppModel initBoard initBoard False where
     initBoard =
         [ [BR], [BN], [BB], [BQ], [BK], [BB], [BN], [BR]
         , [BP], [BP], [BP], [BP], [BP], [BP], [BP], [BP]
