@@ -11,6 +11,7 @@ module Model.AppModel
     , getBoardState
     , getPathOrColor
     , validateMove
+    , getPly
     ) where
 
 import Control.Lens
@@ -53,11 +54,11 @@ getPathOrColor (color, pieceType) = Left imagePath where
         King -> "K"
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
-validateMove _ (board, ixTo, _) = any id validConditions where
-    validConditions =
-        [ null $ board!!ixTo
-        , snd (head (board!!ixTo)) /= King
-        ]
+validateMove model info = valid where
+    valid = getPly info `elem` legalPlies (model ^. chessPosition)
+
+getPly :: ([[Piece]], Int, Int) -> Ply
+getPly (_, ixTo, ixFrom) = move (getSquare ixFrom) (getSquare ixTo)
 
 getSquare :: Int -> Square
 getSquare = (squares!!) where

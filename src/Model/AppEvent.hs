@@ -36,4 +36,9 @@ syncBoardHandle model = [Model $ model & boardState .~ state] where
     state = getBoardState $ model ^. chessPosition
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
-boardChangedHandle _ _ = []
+boardChangedHandle info model = response where
+    response =
+        [ Model $ model & chessPosition .~ newPosition
+        , Event AppSyncBoard
+        ]
+    newPosition = unsafeDoPly (model ^. chessPosition) (getPly info)
