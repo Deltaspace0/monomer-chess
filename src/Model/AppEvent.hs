@@ -4,6 +4,7 @@ module Model.AppEvent
     ) where
 
 import Control.Lens
+import Game.Chess
 import Monomer
 
 import Model.AppModel
@@ -11,6 +12,7 @@ import Model.AppModel
 data AppEvent
     = AppInit
     | AppResetBoard
+    | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
     deriving (Eq, Show)
 
@@ -20,12 +22,18 @@ handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
     AppInit -> []
     AppResetBoard -> resetBoardHandle model
+    AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
 
 resetBoardHandle :: EventHandle
-resetBoardHandle model = response where
-    response = [Model $ model & boardState .~ initBoard]
-    initBoard = model ^. initBoardState
+resetBoardHandle model =
+    [ Model $ model & chessPosition .~ startpos
+    , Event AppSyncBoard
+    ]
+
+syncBoardHandle :: EventHandle
+syncBoardHandle model = [Model $ model & boardState .~ state] where
+    state = getBoardState $ model ^. chessPosition
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle _ _ = []

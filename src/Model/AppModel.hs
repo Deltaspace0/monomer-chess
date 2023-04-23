@@ -6,13 +6,15 @@ module Model.AppModel
     ( Piece
     , AppModel(..)
     , boardState
-    , initBoardState
+    , chessPosition
     , initModel
+    , getBoardState
     , getPathOrColor
     , validateMove
     ) where
 
 import Control.Lens
+import Data.Maybe
 import Game.Chess
 import Data.Text (Text)
 import qualified Monomer as M
@@ -21,35 +23,30 @@ type Piece = (Color, PieceType)
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
-    , _amInitBoardState :: [[Piece]]
+    , _amChessPosition :: Position
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
-initModel = AppModel initBoard initBoard where
-    initBoard =
-        [ [bR], [bN], [bB], [bQ], [bK], [bB], [bN], [bR]
-        , [bP], [bP], [bP], [bP], [bP], [bP], [bP], [bP]
-        , [], [], [], [], [], [], [], []
-        , [], [], [], [], [], [], [], []
-        , [], [], [], [], [], [], [], []
-        , [], [], [], [], [], [], [], []
-        , [wP], [wP], [wP], [wP], [wP], [wP], [wP], [wP]
-        , [wR], [wN], [wB], [wQ], [wK], [wB], [wN], [wR]
+initModel = AppModel initBoardState startpos where
+    initBoardState = getBoardState startpos
+
+getBoardState :: Position -> [[Piece]]
+getBoardState position = setPiece <$> [0..63] where
+    setPiece i = let p = pieceAt position (squares!!i) in if null p
+        then []
+        else [fromJust p]
+    squares =
+        [ A8, B8, C8, D8, E8, F8, G8, H8
+        , A7, B7, C7, D7, E7, F7, G7, H7
+        , A6, B6, C6, D6, E6, F6, G6, H6
+        , A5, B5, C5, D5, E5, F5, G5, H5
+        , A4, B4, C4, D4, E4, F4, G4, H4
+        , A3, B3, C3, D3, E3, F3, G3, H3
+        , A2, B2, C2, D2, E2, F2, G2, H2
+        , A1, B1, C1, D1, E1, F1, G1, H1
         ]
-    bR = (Black, Rook)
-    bN = (Black, Knight)
-    bB = (Black, Bishop)
-    bQ = (Black, Queen)
-    bK = (Black, King)
-    bP = (Black, Pawn)
-    wR = (White, Rook)
-    wN = (White, Knight)
-    wB = (White, Bishop)
-    wQ = (White, Queen)
-    wK = (White, King)
-    wP = (White, Pawn)
 
 getPathOrColor :: Piece -> Either Text M.Color
 getPathOrColor (color, pieceType) = Left imagePath where
