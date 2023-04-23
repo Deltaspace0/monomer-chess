@@ -25,14 +25,25 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Model
+      Model.AppEvent
+      Model.AppModel
+      Model.Piece
+      UI
   other-modules:
       Paths_monomer_chess
   hs-source-dirs:
       src
+  default-extensions:
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , lens
+    , monomer
+    , monomer-widgets
+    , text
+    , text-show
   default-language: Haskell2010
 
 executable monomer-chess-exe
@@ -41,10 +52,17 @@ executable monomer-chess-exe
       Paths_monomer_chess
   hs-source-dirs:
       app
+  default-extensions:
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , lens
+    , monomer
     , monomer-chess
+    , monomer-widgets
+    , text
+    , text-show
   default-language: Haskell2010
 
 test-suite monomer-chess-test
@@ -54,8 +72,15 @@ test-suite monomer-chess-test
       Paths_monomer_chess
   hs-source-dirs:
       test
+  default-extensions:
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , lens
+    , monomer
     , monomer-chess
+    , monomer-widgets
+    , text
+    , text-show
   default-language: Haskell2010

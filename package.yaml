@@ -21,6 +21,14 @@ description:         Please see the README on GitHub at <https://github.com/Delt
 
 dependencies:
 - base >= 4.7 && < 5
+- lens
+- monomer
+- monomer-widgets
+- text
+- text-show
+
+default-extensions:
+- OverloadedStrings
 
 ghc-options:
 - -Wall
