@@ -1,0 +1,2 @@
+--command "stack ghci --main-is monomer-chess:exe:monomer-chess-exe"
+--test ":main"
