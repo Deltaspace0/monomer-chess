@@ -13,9 +13,14 @@ data AppEvent
     | AppResetBoard
     deriving (Eq, Show)
 
+type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
+
 handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
     AppInit -> []
-    AppResetBoard -> [Model $ model & boardState .~ initBoard]
-    where
-        initBoard = model ^. initBoardState
+    AppResetBoard -> resetBoardHandle model
+
+resetBoardHandle :: EventHandle
+resetBoardHandle model = response where
+    response = [Model $ model & boardState .~ initBoard]
+    initBoard = model ^. initBoardState
