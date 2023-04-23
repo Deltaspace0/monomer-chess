@@ -22,6 +22,7 @@ buildUI _ model = tree where
     gameBoard = dragboard_ 8 8 boardState getPathOrColor
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
+        , onChange AppBoardChanged
         ]
     box' x = box_ [alignMiddle, alignCenter] x `styleBasic`
         [ sizeReqW $ fixedSize 400

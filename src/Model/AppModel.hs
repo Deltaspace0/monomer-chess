@@ -3,7 +3,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.AppModel
-    ( AppModel(..)
+    ( Piece
+    , AppModel(..)
     , boardState
     , initBoardState
     , initModel
