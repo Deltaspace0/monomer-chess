@@ -6,7 +6,6 @@ module Model.AppModel
     ( AppModel(..)
     , boardState
     , initBoardState
-    , allPawns
     , initModel
     , getPathOrColor
     , validateMove
@@ -22,13 +21,12 @@ type Piece = (Color, PieceType)
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amInitBoardState :: [[Piece]]
-    , _amAllPawns :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
-initModel = AppModel initBoard initBoard False where
+initModel = AppModel initBoard initBoard where
     initBoard =
         [ [bR], [bN], [bB], [bQ], [bK], [bB], [bN], [bR]
         , [bP], [bP], [bP], [bP], [bP], [bP], [bP], [bP]
@@ -52,16 +50,13 @@ initModel = AppModel initBoard initBoard False where
     wK = (White, King)
     wP = (White, Pawn)
 
-getPathOrColor :: AppModel -> Piece -> Either Text M.Color
-getPathOrColor model (color, pieceType) = Left imagePath where
-    imagePath = if model ^. allPawns
-        then buildPath Pawn
-        else buildPath pieceType
-    buildPath p = "assets/chess-pieces/" <> c <> f p <> ".png"
+getPathOrColor :: Piece -> Either Text M.Color
+getPathOrColor (color, pieceType) = Left imagePath where
+    imagePath = "assets/chess-pieces/" <> c <> p <> ".png"
     c = case color of
         White -> "w"
         Black -> "b"
-    f p = case p of
+    p = case pieceType of
         Pawn -> "P"
         Knight -> "N"
         Bishop -> "B"
@@ -70,9 +65,8 @@ getPathOrColor model (color, pieceType) = Left imagePath where
         King -> "K"
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
-validateMove model (board, ixTo, _) = any id validConditions where
+validateMove _ (board, ixTo, _) = any id validConditions where
     validConditions =
-        [ model ^. allPawns
-        , null $ board!!ixTo
+        [ null $ board!!ixTo
         , snd (head (board!!ixTo)) /= King
         ]
