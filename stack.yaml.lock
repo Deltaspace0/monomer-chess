@@ -5,6 +5,13 @@
 
 packages:
 - completed:
+    hackage: chessIO-0.9.3.1@sha256:d66a556533fb2b64f2c6d2fe1886e6b80a8da2cc4ba86f303b61f8161c63d96c,5044
+    pantry-tree:
+      sha256: d664f13db3a89d5a9bad8957f4f51b18a1d55ae4f282fb4fc5fe7f0a39b6d021
+      size: 1407
+  original:
+    hackage: chessIO-0.9.3.1
+- completed:
     hackage: monomer-1.5.1.0@sha256:18e3ce60c7f5d3fae74bf5ace7515f0e252b12ccc4b71030f948e6fdc1f49a99,16741
     pantry-tree:
       sha256: 3dde2b635d1298c3b734c0b28bae8fa4956bc2ad9ef89f81bbb04ec1eeb09d0c

@@ -41,6 +41,7 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
+- chessIO-0.9.3.1
 - monomer-1.5.1.0
 - nanovg-0.8.1.0
 - git: https://github.com/Deltaspace0/monomer-widgets.git

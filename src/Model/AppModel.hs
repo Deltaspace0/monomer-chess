@@ -3,8 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.AppModel
-    ( module Model.Piece
-    , AppModel(..)
+    ( AppModel(..)
     , boardState
     , initBoardState
     , allPawns
@@ -14,10 +13,11 @@ module Model.AppModel
     ) where
 
 import Control.Lens
+import Game.Chess
 import Data.Text (Text)
-import Monomer
+import qualified Monomer as M
 
-import Model.Piece
+type Piece = (Color, PieceType)
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
@@ -30,49 +30,49 @@ makeLensesWith abbreviatedFields 'AppModel
 initModel :: AppModel
 initModel = AppModel initBoard initBoard False where
     initBoard =
-        [ [BR], [BN], [BB], [BQ], [BK], [BB], [BN], [BR]
-        , [BP], [BP], [BP], [BP], [BP], [BP], [BP], [BP]
+        [ [bR], [bN], [bB], [bQ], [bK], [bB], [bN], [bR]
+        , [bP], [bP], [bP], [bP], [bP], [bP], [bP], [bP]
         , [], [], [], [], [], [], [], []
         , [], [], [], [], [], [], [], []
         , [], [], [], [], [], [], [], []
         , [], [], [], [], [], [], [], []
-        , [WP], [WP], [WP], [WP], [WP], [WP], [WP], [WP]
-        , [WR], [WN], [WB], [WQ], [WK], [WB], [WN], [WR]
+        , [wP], [wP], [wP], [wP], [wP], [wP], [wP], [wP]
+        , [wR], [wN], [wB], [wQ], [wK], [wB], [wN], [wR]
         ]
+    bR = (Black, Rook)
+    bN = (Black, Knight)
+    bB = (Black, Bishop)
+    bQ = (Black, Queen)
+    bK = (Black, King)
+    bP = (Black, Pawn)
+    wR = (White, Rook)
+    wN = (White, Knight)
+    wB = (White, Bishop)
+    wQ = (White, Queen)
+    wK = (White, King)
+    wP = (White, Pawn)
 
-getPathOrColor :: AppModel -> Piece -> Either Text Color
-getPathOrColor model piece = if model ^. allPawns
-    then case piece of
-        BR -> Left "assets/chess-pieces/bP.png"
-        BN -> Left "assets/chess-pieces/bP.png"
-        BB -> Left "assets/chess-pieces/bP.png"
-        BQ -> Left "assets/chess-pieces/bP.png"
-        BK -> Left "assets/chess-pieces/bP.png"
-        BP -> Left "assets/chess-pieces/bP.png"
-        WR -> Left "assets/chess-pieces/wP.png"
-        WN -> Left "assets/chess-pieces/wP.png"
-        WB -> Left "assets/chess-pieces/wP.png"
-        WQ -> Left "assets/chess-pieces/wP.png"
-        WK -> Left "assets/chess-pieces/wP.png"
-        WP -> Left "assets/chess-pieces/wP.png"
-    else case piece of
-        BR -> Left "assets/chess-pieces/bR.png"
-        BN -> Left "assets/chess-pieces/bN.png"
-        BB -> Left "assets/chess-pieces/bB.png"
-        BQ -> Left "assets/chess-pieces/bQ.png"
-        BK -> Left "assets/chess-pieces/bK.png"
-        BP -> Left "assets/chess-pieces/bP.png"
-        WR -> Left "assets/chess-pieces/wR.png"
-        WN -> Left "assets/chess-pieces/wN.png"
-        WB -> Left "assets/chess-pieces/wB.png"
-        WQ -> Left "assets/chess-pieces/wQ.png"
-        WK -> Left "assets/chess-pieces/wK.png"
-        WP -> Left "assets/chess-pieces/wP.png"
+getPathOrColor :: AppModel -> Piece -> Either Text M.Color
+getPathOrColor model (color, pieceType) = Left imagePath where
+    imagePath = if model ^. allPawns
+        then buildPath Pawn
+        else buildPath pieceType
+    buildPath p = "assets/chess-pieces/" <> c <> f p <> ".png"
+    c = case color of
+        White -> "w"
+        Black -> "b"
+    f p = case p of
+        Pawn -> "P"
+        Knight -> "N"
+        Bishop -> "B"
+        Rook -> "R"
+        Queen -> "Q"
+        King -> "K"
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model (board, ixTo, _) = any id validConditions where
     validConditions =
         [ model ^. allPawns
         , null $ board!!ixTo
-        , not $ head (board!!ixTo) `elem` [WK, BK]
+        , snd (head (board!!ixTo)) /= King
         ]
