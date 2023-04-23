@@ -33,20 +33,10 @@ initModel = AppModel initBoardState startpos where
     initBoardState = getBoardState startpos
 
 getBoardState :: Position -> [[Piece]]
-getBoardState position = setPiece <$> [0..63] where
-    setPiece i = let p = pieceAt position (squares!!i) in if null p
+getBoardState position = setPiece . getSquare <$> [0..63] where
+    setPiece square = let p = pieceAt position square in if null p
         then []
         else [fromJust p]
-    squares =
-        [ A8, B8, C8, D8, E8, F8, G8, H8
-        , A7, B7, C7, D7, E7, F7, G7, H7
-        , A6, B6, C6, D6, E6, F6, G6, H6
-        , A5, B5, C5, D5, E5, F5, G5, H5
-        , A4, B4, C4, D4, E4, F4, G4, H4
-        , A3, B3, C3, D3, E3, F3, G3, H3
-        , A2, B2, C2, D2, E2, F2, G2, H2
-        , A1, B1, C1, D1, E1, F1, G1, H1
-        ]
 
 getPathOrColor :: Piece -> Either Text M.Color
 getPathOrColor (color, pieceType) = Left imagePath where
@@ -67,4 +57,17 @@ validateMove _ (board, ixTo, _) = any id validConditions where
     validConditions =
         [ null $ board!!ixTo
         , snd (head (board!!ixTo)) /= King
+        ]
+
+getSquare :: Int -> Square
+getSquare = (squares!!) where
+    squares =
+        [ A8, B8, C8, D8, E8, F8, G8, H8
+        , A7, B7, C7, D7, E7, F7, G7, H7
+        , A6, B6, C6, D6, E6, F6, G6, H6
+        , A5, B5, C5, D5, E5, F5, G5, H5
+        , A4, B4, C4, D4, E4, F4, G4, H4
+        , A3, B3, C3, D3, E3, F3, G3, H3
+        , A2, B2, C2, D2, E2, F2, G2, H2
+        , A1, B1, C1, D1, E1, F1, G1, H1
         ]
