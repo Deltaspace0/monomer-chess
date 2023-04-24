@@ -9,6 +9,7 @@ module Model.AppModel
     , nextPly
     , chessPosition
     , showPromotionMenu
+    , autoQueen
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -31,13 +32,19 @@ data AppModel = AppModel
     , _amChessPosition :: Position
     , _amNextPly :: Maybe Ply
     , _amShowPromotionMenu :: Bool
+    , _amAutoQueen :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
-initModel = AppModel initBoardState startpos Nothing False where
-    initBoardState = getBoardState startpos
+initModel = AppModel
+    { _amBoardState = getBoardState startpos
+    , _amChessPosition = startpos
+    , _amNextPly = Nothing
+    , _amShowPromotionMenu = False
+    , _amAutoQueen = False
+    }
 
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn model = color (model ^. chessPosition) == White

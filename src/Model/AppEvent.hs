@@ -44,12 +44,18 @@ syncBoardHandle model = [Model $ model & boardState .~ state] where
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info model = response where
-    response =
-        [ Model $ model & nextPly .~ Just ply
-        , responseIf (null $ plyPromotion ply) $ Event AppRunNextPly
-        , responseIf (not $ null $ plyPromotion ply) $
-            Event $ AppSetPromotionMenu True
-        ]
+    response = if model ^. autoQueen
+        then
+            [ setNextPly
+            , Event AppRunNextPly
+            ]
+        else
+            [ setNextPly
+            , Event $ if null (plyPromotion ply)
+                then AppRunNextPly
+                else AppSetPromotionMenu True
+            ]
+    setNextPly = Model $ model & nextPly .~ Just ply
     ply = promotePly model (getPly info) Queen
 
 setPromotionMenuHandle :: Bool -> EventHandle
