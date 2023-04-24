@@ -10,6 +10,7 @@ module Model.AppModel
     , chessPosition
     , showPromotionMenu
     , initModel
+    , isWhiteTurn
     , getBoardState
     , getPathOrColor
     , validateMove
@@ -37,6 +38,9 @@ makeLensesWith abbreviatedFields 'AppModel
 initModel :: AppModel
 initModel = AppModel initBoardState startpos Nothing False where
     initBoardState = getBoardState startpos
+
+isWhiteTurn :: AppModel -> Bool
+isWhiteTurn model = color (model ^. chessPosition) == White
 
 getBoardState :: Position -> [[Piece]]
 getBoardState position = setPiece . getSquare <$> [0..63] where

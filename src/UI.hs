@@ -5,6 +5,7 @@ module UI
 import Control.Lens
 import Game.Chess
 import Monomer
+import Monomer.Checkerboard
 import Monomer.Dragboard
 
 import Model
@@ -18,21 +19,37 @@ buildUI _ model = tree where
                 , sizeReqH $ fixedSize 400
                 ]
             , widgetIf (model ^. showPromotionMenu) $
-                alert (AppSetPromotionMenu False) $ vstack'
-                    [ label "Promote to:"
-                    , button "Queen" $ AppPromote Queen
-                    , button "Rook" $ AppPromote Rook
-                    , button "Bishop" $ AppPromote Bishop
-                    , button "Knight" $ AppPromote Knight
-                    ]
+                alert (AppSetPromotionMenu False) promotionMenu
             ]
         , separatorLine
         , vstack'
             [ button "Reset board" AppResetBoard
             ]
         ] `styleBasic` [padding 64]
+    promotionMenu = vstack'
+        [ label "Promote to:"
+        , checkerboard 2 2 promotionPieces `styleBasic`
+            [ sizeReqW $ fixedSize 100
+            , sizeReqH $ fixedSize 100
+            ]
+        ]
+    promotionPieces = makeClickPiece <$> if isWhiteTurn model
+        then
+            [ ("wQ", Queen)
+            , ("wR", Rook)
+            , ("wB", Bishop)
+            , ("wN", Knight)
+            ]
+        else
+            [ ("bQ", Queen)
+            , ("bR", Rook)
+            , ("bB", Bishop)
+            , ("bN", Knight)
+            ]
+    makeClickPiece (p, e) = box_ [onClick $ AppPromote e] $
+        image_ ("assets/chess-pieces/" <> p <> ".png") [fitEither]
     hstack' = hstack_ [childSpacing_ 64]
-    vstack' = vstack_ [childSpacing_ 64]
+    vstack' = vstack_ [childSpacing_ 16]
     gameBoard = dragboard_ 8 8 boardState getPathOrColor
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
