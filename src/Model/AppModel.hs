@@ -12,6 +12,7 @@ module Model.AppModel
     , autoQueen
     , boardRotated
     , randomGenerator
+    , autoRandom
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -38,6 +39,7 @@ data AppModel = AppModel
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
     , _amRandomGenerator :: StdGen
+    , _amAutoRandom :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -51,6 +53,7 @@ initModel g = AppModel
     , _amAutoQueen = False
     , _amBoardRotated = False
     , _amRandomGenerator = g
+    , _amAutoRandom = False
     }
 
 isWhiteTurn :: AppModel -> Bool

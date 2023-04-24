@@ -60,15 +60,20 @@ boardChangedHandle info model = response where
         then
             [ setNextPly
             , Event AppRunNextPly
+            , responseIf rand $ Event AppPlayRandomMove
             ]
         else
             [ setNextPly
-            , Event $ if null (plyPromotion ply)
+            , Event $ if noPromotion
                 then AppRunNextPly
                 else AppSetPromotionMenu True
+            , responseIf (rand && noPromotion) $
+                Event AppPlayRandomMove
             ]
     setNextPly = Model $ model & nextPly .~ Just ply
     ply = getPromotedPly model info Queen
+    noPromotion = null $ plyPromotion ply
+    rand = model ^. autoRandom
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
@@ -93,6 +98,7 @@ promoteHandle pieceType model = response where
         [ Model $ model & nextPly %~ ((`promoteTo` pieceType) <$>)
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
+        , responseIf (model ^. autoRandom) $ Event AppPlayRandomMove
         ]
 
 playRandomMoveHandle :: EventHandle
