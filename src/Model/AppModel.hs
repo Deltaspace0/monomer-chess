@@ -13,12 +13,13 @@ module Model.AppModel
     , autoQueen
     , boardRotated
     , randomGenerator
-    , autoRandom
+    , autoRespond
     , initModel
     , isWhiteTurn
     , getBoardState
     , getPathOrColor
     , validateMove
+    , calculateMove
     , getPromotedPly
     , getPly
     ) where
@@ -41,7 +42,7 @@ data AppModel = AppModel
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
     , _amRandomGenerator :: StdGen
-    , _amAutoRandom :: Bool
+    , _amAutoRespond :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -56,7 +57,7 @@ initModel g = AppModel
     , _amAutoQueen = False
     , _amBoardRotated = False
     , _amRandomGenerator = g
-    , _amAutoRandom = False
+    , _amAutoRespond = False
     }
 
 isWhiteTurn :: AppModel -> Bool
@@ -88,6 +89,14 @@ validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model info = valid where
     valid = getPromotedPly model info Queen `elem` legal
     legal = legalPlies $ model ^. chessPosition
+
+calculateMove :: AppModel -> (Maybe Ply, StdGen)
+calculateMove model = (ply, g) where
+    ply = if null legal
+        then Nothing
+        else Just $ legal!!i
+    legal = legalPlies $ model ^. chessPosition
+    (i, g) = randomR (0, length legal-1) $ model ^. randomGenerator
 
 getPromotedPly
     :: AppModel

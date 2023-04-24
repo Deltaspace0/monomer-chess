@@ -7,7 +7,6 @@ import Control.Lens
 import Data.Maybe
 import Game.Chess
 import Monomer
-import System.Random
 
 import Model.AppModel
 
@@ -20,7 +19,7 @@ data AppEvent
     | AppSetPromotionMenu Bool
     | AppRunNextPly
     | AppPromote PieceType
-    | AppPlayRandomMove
+    | AppPlayNextResponse
     | AppUndoMove
     deriving (Eq, Show)
 
@@ -36,7 +35,7 @@ handleEvent _ _ model event = case event of
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
-    AppPlayRandomMove -> playRandomMoveHandle model
+    AppPlayNextResponse -> playNextResponseHandle model
     AppUndoMove -> undoMoveHandle model
 
 resetBoardHandle :: EventHandle
@@ -64,20 +63,20 @@ boardChangedHandle info model = response where
         then
             [ setNextPly
             , Event AppRunNextPly
-            , responseIf rand $ Event AppPlayRandomMove
+            , responseIf resp $ Event AppPlayNextResponse
             ]
         else
             [ setNextPly
             , Event $ if noPromotion
                 then AppRunNextPly
                 else AppSetPromotionMenu True
-            , responseIf (rand && noPromotion) $
-                Event AppPlayRandomMove
+            , responseIf (resp && noPromotion) $
+                Event AppPlayNextResponse
             ]
     setNextPly = Model $ model & nextPly .~ Just ply
     ply = getPromotedPly model info Queen
     noPromotion = null $ plyPromotion ply
-    rand = model ^. autoRandom
+    resp = model ^. autoRespond
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
@@ -104,20 +103,17 @@ promoteHandle pieceType model = response where
         [ Model $ model & nextPly %~ ((`promoteTo` pieceType) <$>)
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
-        , responseIf (model ^. autoRandom) $ Event AppPlayRandomMove
+        , responseIf resp $ Event AppPlayNextResponse
         ]
+    resp = model ^. autoRespond
 
-playRandomMoveHandle :: EventHandle
-playRandomMoveHandle model = response where
+playNextResponseHandle :: EventHandle
+playNextResponseHandle model = response where
     response =
         [ Model $ model & nextPly .~ ply & randomGenerator .~ g
         , Event AppRunNextPly
         ]
-    ply = if null legal
-        then Nothing
-        else Just $ legal!!i
-    legal = legalPlies $ model ^. chessPosition
-    (i, g) = randomR (0, length legal-1) $ model ^. randomGenerator
+    (ply, g) = calculateMove model
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model = response where

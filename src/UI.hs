@@ -25,10 +25,10 @@ buildUI _ model = tree where
         , vstack'
             [ button "Reset board" AppResetBoard
             , button "Rotate board" AppRotateBoard
-            , button "Play random move" AppPlayRandomMove
+            , button "Play next response" AppPlayNextResponse
             , button "Undo move" AppUndoMove
             , labeledCheckbox "Auto promote to queen" autoQueen
-            , labeledCheckbox "Auto respond randomly" autoRandom
+            , labeledCheckbox "Auto respond" autoRespond
             ]
         ] `styleBasic` [padding 64]
     promotionMenu = vstack'
