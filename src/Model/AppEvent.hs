@@ -21,6 +21,7 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayRandomMove
+    | AppUndoMove
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -36,10 +37,13 @@ handleEvent _ _ model event = case event of
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayRandomMove -> playRandomMoveHandle model
+    AppUndoMove -> undoMoveHandle model
 
 resetBoardHandle :: EventHandle
 resetBoardHandle model =
-    [ Model $ model & chessPosition .~ startpos
+    [ Model $ model
+        & chessPosition .~ startpos
+        & previousPositions .~ []
     , Event AppSyncBoard
     ]
 
@@ -86,11 +90,13 @@ runNextPlyHandle model = response where
     response = if null newPosition
         then []
         else
-            [ Model $ model & chessPosition .~ fromJust newPosition
+            [ Model $ model
+                & chessPosition .~ fromJust newPosition
+                & previousPositions %~ (currentPosition:)
             , Event AppSyncBoard
             ]
-    newPosition = unsafeDoPly (model ^. chessPosition) <$> ply
-    ply = model ^. nextPly
+    newPosition = unsafeDoPly currentPosition <$> model ^. nextPly
+    currentPosition = model ^. chessPosition
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model = response where
@@ -112,3 +118,15 @@ playRandomMoveHandle model = response where
         else Just $ legal!!i
     legal = legalPlies $ model ^. chessPosition
     (i, g) = randomR (0, length legal-1) $ model ^. randomGenerator
+
+undoMoveHandle :: EventHandle
+undoMoveHandle model = response where
+    response = if null positions
+        then []
+        else
+            [ Model $ model
+                & chessPosition .~ head positions
+                & previousPositions .~ tail positions
+            , Event AppSyncBoard
+            ]
+    positions = model ^. previousPositions

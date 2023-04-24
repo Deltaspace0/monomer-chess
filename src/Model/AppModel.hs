@@ -8,6 +8,7 @@ module Model.AppModel
     , boardState
     , nextPly
     , chessPosition
+    , previousPositions
     , showPromotionMenu
     , autoQueen
     , boardRotated
@@ -34,6 +35,7 @@ type Piece = (Color, PieceType)
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amChessPosition :: Position
+    , _amPreviousPositions :: [Position]
     , _amNextPly :: Maybe Ply
     , _amShowPromotionMenu :: Bool
     , _amAutoQueen :: Bool
@@ -48,6 +50,7 @@ initModel :: StdGen -> AppModel
 initModel g = AppModel
     { _amBoardState = getBoardState False startpos
     , _amChessPosition = startpos
+    , _amPreviousPositions = []
     , _amNextPly = Nothing
     , _amShowPromotionMenu = False
     , _amAutoQueen = False
