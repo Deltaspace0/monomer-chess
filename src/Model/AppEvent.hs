@@ -14,6 +14,7 @@ data AppEvent
     | AppResetBoard
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
+    | AppSetPromotionMenu Bool
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -24,6 +25,7 @@ handleEvent _ _ model event = case event of
     AppResetBoard -> resetBoardHandle model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
+    AppSetPromotionMenu v -> setPromotionMenuHandle v model
 
 resetBoardHandle :: EventHandle
 resetBoardHandle model =
@@ -40,6 +42,12 @@ boardChangedHandle info model = response where
     response =
         [ Model $ model & chessPosition .~ newPosition
         , Event AppSyncBoard
+        , responseIf (not $ null $ plyPromotion ply) $
+            Event $ AppSetPromotionMenu True
         ]
     newPosition = unsafeDoPly (model ^. chessPosition) ply
     ply = promotePly model (getPly info) Queen
+
+setPromotionMenuHandle :: Bool -> EventHandle
+setPromotionMenuHandle v model = response where
+    response = [Model $ model & showPromotionMenu .~ v]

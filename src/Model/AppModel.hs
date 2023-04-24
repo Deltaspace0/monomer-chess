@@ -7,6 +7,7 @@ module Model.AppModel
     , AppModel(..)
     , boardState
     , chessPosition
+    , showPromotionMenu
     , initModel
     , getBoardState
     , getPathOrColor
@@ -26,12 +27,13 @@ type Piece = (Color, PieceType)
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amChessPosition :: Position
+    , _amShowPromotionMenu :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
-initModel = AppModel initBoardState startpos where
+initModel = AppModel initBoardState startpos False where
     initBoardState = getBoardState startpos
 
 getBoardState :: Position -> [[Piece]]
