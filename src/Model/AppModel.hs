@@ -58,8 +58,8 @@ getBoardState r position = setPiece . getSquare r <$> [0..63] where
         then []
         else [fromJust p]
 
-getPathOrColor :: Piece -> Either Text M.Color
-getPathOrColor (color, pieceType) = Left imagePath where
+getPathOrColor :: AppModel -> Piece -> Either Text M.Color
+getPathOrColor model (color, pieceType) = Left imagePath where
     imagePath = "assets/chess-pieces/" <> c <> p <> ".png"
     c = case color of
         White -> "w"
@@ -70,7 +70,9 @@ getPathOrColor (color, pieceType) = Left imagePath where
         Bishop -> "B"
         Rook -> "R"
         Queen -> "Q"
-        King -> "K"
+        King -> if inCheck color (model ^. chessPosition)
+            then "KC"
+            else "K"
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model info = valid where

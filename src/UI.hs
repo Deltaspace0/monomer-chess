@@ -52,7 +52,7 @@ buildUI _ model = tree where
         image_ ("assets/chess-pieces/" <> p <> ".png") [fitEither]
     hstack' = hstack_ [childSpacing_ 64]
     vstack' = vstack_ [childSpacing_ 16]
-    gameBoard = dragboard_ 8 8 boardState getPathOrColor
+    gameBoard = dragboard_ 8 8 boardState (getPathOrColor model)
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
         , onChange AppBoardChanged
