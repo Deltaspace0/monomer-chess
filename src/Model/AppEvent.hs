@@ -46,15 +46,17 @@ boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info model = response where
     response =
         [ Model $ model & nextPly .~ Just ply
-        , Event AppRunNextPly
+        , responseIf (null $ plyPromotion ply) $ Event AppRunNextPly
         , responseIf (not $ null $ plyPromotion ply) $
             Event $ AppSetPromotionMenu True
         ]
     ply = promotePly model (getPly info) Queen
 
 setPromotionMenuHandle :: Bool -> EventHandle
-setPromotionMenuHandle v model = response where
-    response = [Model $ model & showPromotionMenu .~ v]
+setPromotionMenuHandle v model =
+    [ Model $ model & showPromotionMenu .~ v
+    , Event AppSyncBoard
+    ]
 
 runNextPlyHandle :: EventHandle
 runNextPlyHandle model = response where
@@ -71,6 +73,7 @@ promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model = response where
     response =
         [ Model $ model & nextPly .~ promotedPly
+        , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
         ]
     promotedPly = flip (promotePly model) pieceType <$> ply

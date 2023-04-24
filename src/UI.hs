@@ -3,6 +3,7 @@ module UI
     ) where
 
 import Control.Lens
+import Game.Chess
 import Monomer
 import Monomer.Dragboard
 
@@ -19,6 +20,10 @@ buildUI _ model = tree where
             , widgetIf (model ^. showPromotionMenu) $
                 alert (AppSetPromotionMenu False) $ vstack'
                     [ label "Promote to:"
+                    , button "Queen" $ AppPromote Queen
+                    , button "Rook" $ AppPromote Rook
+                    , button "Bishop" $ AppPromote Bishop
+                    , button "Knight" $ AppPromote Knight
                     ]
             ]
         , separatorLine
