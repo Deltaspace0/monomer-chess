@@ -4,6 +4,7 @@ module Model.AppEvent
     ) where
 
 import Control.Lens
+import Data.Maybe
 import Game.Chess
 import Monomer
 
@@ -15,6 +16,8 @@ data AppEvent
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
     | AppSetPromotionMenu Bool
+    | AppRunNextPly
+    | AppPromote PieceType
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -26,6 +29,8 @@ handleEvent _ _ model event = case event of
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
+    AppRunNextPly -> runNextPlyHandle model
+    AppPromote pieceType -> promoteHandle pieceType model
 
 resetBoardHandle :: EventHandle
 resetBoardHandle model =
@@ -40,14 +45,33 @@ syncBoardHandle model = [Model $ model & boardState .~ state] where
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info model = response where
     response =
-        [ Model $ model & chessPosition .~ newPosition
-        , Event AppSyncBoard
+        [ Model $ model & nextPly .~ Just ply
+        , Event AppRunNextPly
         , responseIf (not $ null $ plyPromotion ply) $
             Event $ AppSetPromotionMenu True
         ]
-    newPosition = unsafeDoPly (model ^. chessPosition) ply
     ply = promotePly model (getPly info) Queen
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model = response where
     response = [Model $ model & showPromotionMenu .~ v]
+
+runNextPlyHandle :: EventHandle
+runNextPlyHandle model = response where
+    response = if null newPosition
+        then []
+        else
+            [ Model $ model & chessPosition .~ fromJust newPosition
+            , Event AppSyncBoard
+            ]
+    newPosition = unsafeDoPly (model ^. chessPosition) <$> ply
+    ply = model ^. nextPly
+
+promoteHandle :: PieceType -> EventHandle
+promoteHandle pieceType model = response where
+    response =
+        [ Model $ model & nextPly .~ promotedPly
+        , Event AppRunNextPly
+        ]
+    promotedPly = flip (promotePly model) pieceType <$> ply
+    ply = model ^. nextPly
