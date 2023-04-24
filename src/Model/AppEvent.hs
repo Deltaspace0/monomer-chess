@@ -41,4 +41,5 @@ boardChangedHandle info model = response where
         [ Model $ model & chessPosition .~ newPosition
         , Event AppSyncBoard
         ]
-    newPosition = unsafeDoPly (model ^. chessPosition) (getPly info)
+    newPosition = unsafeDoPly (model ^. chessPosition) ply
+    ply = promotePly model (getPly info) Queen

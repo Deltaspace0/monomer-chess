@@ -12,6 +12,7 @@ module Model.AppModel
     , getPathOrColor
     , validateMove
     , getPly
+    , promotePly
     ) where
 
 import Control.Lens
@@ -55,10 +56,19 @@ getPathOrColor (color, pieceType) = Left imagePath where
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model info = valid where
-    valid = getPly info `elem` legalPlies (model ^. chessPosition)
+    valid = promotePly model (getPly info) Queen `elem` legal
+    legal = legalPlies $ model ^. chessPosition
 
 getPly :: ([[Piece]], Int, Int) -> Ply
 getPly (_, ixTo, ixFrom) = move (getSquare ixFrom) (getSquare ixTo)
+
+promotePly :: AppModel -> Ply -> PieceType -> Ply
+promotePly model ply pieceType = newPly where
+    newPly = if promotedPly `elem` legal
+        then promotedPly
+        else ply
+    promotedPly = ply `promoteTo` pieceType
+    legal = legalPlies $ model ^. chessPosition
 
 getSquare :: Int -> Square
 getSquare = (squares!!) where
