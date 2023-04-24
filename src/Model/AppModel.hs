@@ -33,6 +33,8 @@ import Data.Text (Text)
 import System.Random
 import qualified Monomer as M
 
+import Model.AI
+
 type Piece = (Color, PieceType)
 
 data ResponseMethod
@@ -101,11 +103,11 @@ validateMove model info = valid where
 
 calculateMove :: AppModel -> (Maybe Ply, StdGen)
 calculateMove model = (ply, g) where
-    ply = if null legal
-        then Nothing
-        else Just $ legal!!i
-    legal = legalPlies $ model ^. chessPosition
-    (i, g) = randomR (0, length legal-1) $ model ^. randomGenerator
+    (ply, g) = case model ^. responseMethod of
+        RandomResponse -> randomMove position rand
+        MinimaxResponse -> (minimaxMove position, rand)
+    position = model ^. chessPosition
+    rand = model ^. randomGenerator
 
 getPromotedPly
     :: AppModel
