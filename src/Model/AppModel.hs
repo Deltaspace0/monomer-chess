@@ -4,6 +4,7 @@
 
 module Model.AppModel
     ( Piece
+    , ResponseMethod(..)
     , AppModel(..)
     , boardState
     , nextPly
@@ -14,6 +15,7 @@ module Model.AppModel
     , boardRotated
     , randomGenerator
     , autoRespond
+    , responseMethod
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -33,6 +35,11 @@ import qualified Monomer as M
 
 type Piece = (Color, PieceType)
 
+data ResponseMethod
+    = RandomResponse
+    | MinimaxResponse
+    deriving (Eq, Show)
+
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amChessPosition :: Position
@@ -43,6 +50,7 @@ data AppModel = AppModel
     , _amBoardRotated :: Bool
     , _amRandomGenerator :: StdGen
     , _amAutoRespond :: Bool
+    , _amResponseMethod :: ResponseMethod
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -58,6 +66,7 @@ initModel g = AppModel
     , _amBoardRotated = False
     , _amRandomGenerator = g
     , _amAutoRespond = False
+    , _amResponseMethod = RandomResponse
     }
 
 isWhiteTurn :: AppModel -> Bool

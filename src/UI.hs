@@ -27,8 +27,13 @@ buildUI _ model = tree where
             , button "Rotate board" AppRotateBoard
             , button "Play next response" AppPlayNextResponse
             , button "Undo move" AppUndoMove
+            , separatorLine
             , labeledCheckbox "Auto promote to queen" autoQueen
             , labeledCheckbox "Auto respond" autoRespond
+            , separatorLine
+            , label "How to calculate next response:"
+            , labeledRadio "Random" RandomResponse responseMethod
+            , labeledRadio "Minimax" MinimaxResponse responseMethod
             ]
         ] `styleBasic` [padding 64]
     promotionMenu = vstack'
