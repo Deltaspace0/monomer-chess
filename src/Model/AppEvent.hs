@@ -13,6 +13,7 @@ import Model.AppModel
 data AppEvent
     = AppInit
     | AppResetBoard
+    | AppRotateBoard
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
     | AppSetPromotionMenu Bool
@@ -26,6 +27,7 @@ handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
     AppInit -> []
     AppResetBoard -> resetBoardHandle model
+    AppRotateBoard -> rotateBoardHandle model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
@@ -38,9 +40,16 @@ resetBoardHandle model =
     , Event AppSyncBoard
     ]
 
+rotateBoardHandle :: EventHandle
+rotateBoardHandle model =
+    [ Model $ model & boardRotated %~ not
+    , Event AppSyncBoard
+    ]
+
 syncBoardHandle :: EventHandle
 syncBoardHandle model = [Model $ model & boardState .~ state] where
-    state = getBoardState $ model ^. chessPosition
+    state = getBoardState r $ model ^. chessPosition
+    r = model ^. boardRotated
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info model = response where
@@ -56,7 +65,7 @@ boardChangedHandle info model = response where
                 else AppSetPromotionMenu True
             ]
     setNextPly = Model $ model & nextPly .~ Just ply
-    ply = promotePly model (getPly info) Queen
+    ply = getPromotedPly model info Queen
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
@@ -78,9 +87,7 @@ runNextPlyHandle model = response where
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model = response where
     response =
-        [ Model $ model & nextPly .~ promotedPly
+        [ Model $ model & nextPly %~ ((`promoteTo` pieceType) <$>)
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
         ]
-    promotedPly = flip (promotePly model) pieceType <$> ply
-    ply = model ^. nextPly

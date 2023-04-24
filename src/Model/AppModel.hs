@@ -10,13 +10,14 @@ module Model.AppModel
     , chessPosition
     , showPromotionMenu
     , autoQueen
+    , boardRotated
     , initModel
     , isWhiteTurn
     , getBoardState
     , getPathOrColor
     , validateMove
+    , getPromotedPly
     , getPly
-    , promotePly
     ) where
 
 import Control.Lens
@@ -33,24 +34,26 @@ data AppModel = AppModel
     , _amNextPly :: Maybe Ply
     , _amShowPromotionMenu :: Bool
     , _amAutoQueen :: Bool
+    , _amBoardRotated :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
 initModel = AppModel
-    { _amBoardState = getBoardState startpos
+    { _amBoardState = getBoardState False startpos
     , _amChessPosition = startpos
     , _amNextPly = Nothing
     , _amShowPromotionMenu = False
     , _amAutoQueen = False
+    , _amBoardRotated = False
     }
 
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn model = color (model ^. chessPosition) == White
 
-getBoardState :: Position -> [[Piece]]
-getBoardState position = setPiece . getSquare <$> [0..63] where
+getBoardState :: Bool -> Position -> [[Piece]]
+getBoardState r position = setPiece . getSquare r <$> [0..63] where
     setPiece square = let p = pieceAt position square in if null p
         then []
         else [fromJust p]
@@ -71,11 +74,20 @@ getPathOrColor (color, pieceType) = Left imagePath where
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model info = valid where
-    valid = promotePly model (getPly info) Queen `elem` legal
+    valid = getPromotedPly model info Queen `elem` legal
     legal = legalPlies $ model ^. chessPosition
 
-getPly :: ([[Piece]], Int, Int) -> Ply
-getPly (_, ixTo, ixFrom) = move (getSquare ixFrom) (getSquare ixTo)
+getPromotedPly
+    :: AppModel
+    -> ([[Piece]], Int, Int)
+    -> PieceType
+    -> Ply
+getPromotedPly model info = promotePly model ply where
+    ply = getPly (model ^. boardRotated) info
+
+getPly :: Bool -> ([[Piece]], Int, Int) -> Ply
+getPly r (_, ixTo, ixFrom) = move (f ixFrom) (f ixTo) where
+    f = getSquare r
 
 promotePly :: AppModel -> Ply -> PieceType -> Ply
 promotePly model ply pieceType = newPly where
@@ -85,8 +97,11 @@ promotePly model ply pieceType = newPly where
     promotedPly = ply `promoteTo` pieceType
     legal = legalPlies $ model ^. chessPosition
 
-getSquare :: Int -> Square
-getSquare = (squares!!) where
+getSquare :: Bool -> Int -> Square
+getSquare rotated = f where
+    f = if rotated
+        then (rotatedSquares!!)
+        else (squares!!)
     squares =
         [ A8, B8, C8, D8, E8, F8, G8, H8
         , A7, B7, C7, D7, E7, F7, G7, H7
@@ -96,4 +111,14 @@ getSquare = (squares!!) where
         , A3, B3, C3, D3, E3, F3, G3, H3
         , A2, B2, C2, D2, E2, F2, G2, H2
         , A1, B1, C1, D1, E1, F1, G1, H1
+        ]
+    rotatedSquares =
+        [ H1, G1, F1, E1, D1, C1, B1, A1
+        , H2, G2, F2, E2, D2, C2, B2, A2
+        , H3, G3, F3, E3, D3, C3, B3, A3
+        , H4, G4, F4, E4, D4, C4, B4, A4
+        , H5, G5, F5, E5, D5, C5, B5, A5
+        , H6, G6, F6, E6, D6, C6, B6, A6
+        , H7, G7, F7, E7, D7, C7, B7, A7
+        , H8, G8, F8, E8, D8, C8, B8, A8
         ]
