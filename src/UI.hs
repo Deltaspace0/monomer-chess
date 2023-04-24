@@ -25,6 +25,7 @@ buildUI _ model = tree where
         , vstack'
             [ button "Reset board" AppResetBoard
             , button "Rotate board" AppRotateBoard
+            , button "Play random move" AppPlayRandomMove
             , labeledCheckbox "Auto promote to queen" autoQueen
             ]
         ] `styleBasic` [padding 64]

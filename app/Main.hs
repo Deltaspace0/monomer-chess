@@ -1,13 +1,15 @@
 module Main (main) where
 
 import Monomer
+import System.Random
 
 import Model
 import UI
 
 main :: IO ()
 main = do
-    let model = initModel
+    g <- newStdGen
+    let model = initModel g
         config =
             [ appWindowState $ MainWindowNormal (1000, 600)
             , appWindowTitle "Monomer chess"

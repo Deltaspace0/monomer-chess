@@ -25,6 +25,7 @@ dependencies:
 - lens
 - monomer
 - monomer-widgets
+- random
 - text
 - text-show
 

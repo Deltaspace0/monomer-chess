@@ -11,6 +11,7 @@ module Model.AppModel
     , showPromotionMenu
     , autoQueen
     , boardRotated
+    , randomGenerator
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -24,6 +25,7 @@ import Control.Lens
 import Data.Maybe
 import Game.Chess
 import Data.Text (Text)
+import System.Random
 import qualified Monomer as M
 
 type Piece = (Color, PieceType)
@@ -35,18 +37,20 @@ data AppModel = AppModel
     , _amShowPromotionMenu :: Bool
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
+    , _amRandomGenerator :: StdGen
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
 
-initModel :: AppModel
-initModel = AppModel
+initModel :: StdGen -> AppModel
+initModel g = AppModel
     { _amBoardState = getBoardState False startpos
     , _amChessPosition = startpos
     , _amNextPly = Nothing
     , _amShowPromotionMenu = False
     , _amAutoQueen = False
     , _amBoardRotated = False
+    , _amRandomGenerator = g
     }
 
 isWhiteTurn :: AppModel -> Bool

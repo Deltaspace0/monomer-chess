@@ -7,6 +7,7 @@ import Control.Lens
 import Data.Maybe
 import Game.Chess
 import Monomer
+import System.Random
 
 import Model.AppModel
 
@@ -19,6 +20,7 @@ data AppEvent
     | AppSetPromotionMenu Bool
     | AppRunNextPly
     | AppPromote PieceType
+    | AppPlayRandomMove
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -33,6 +35,7 @@ handleEvent _ _ model event = case event of
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
+    AppPlayRandomMove -> playRandomMoveHandle model
 
 resetBoardHandle :: EventHandle
 resetBoardHandle model =
@@ -91,3 +94,15 @@ promoteHandle pieceType model = response where
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
         ]
+
+playRandomMoveHandle :: EventHandle
+playRandomMoveHandle model = response where
+    response =
+        [ Model $ model & nextPly .~ ply & randomGenerator .~ g
+        , Event AppRunNextPly
+        ]
+    ply = if null legal
+        then Nothing
+        else Just $ legal!!i
+    legal = legalPlies $ model ^. chessPosition
+    (i, g) = randomR (0, length legal-1) $ model ^. randomGenerator
