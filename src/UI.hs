@@ -28,6 +28,7 @@ buildUI _ model = tree where
             , button "Rotate board" AppRotateBoard
             , button "Play next response" AppPlayNextResponse
             , button "Undo move" AppUndoMove
+                `nodeEnabled` (model ^. previousPositions /= [])
             , separatorLine
             , labeledCheckbox "Auto promote to queen" autoQueen
             , labeledCheckbox "Auto respond" autoRespond
