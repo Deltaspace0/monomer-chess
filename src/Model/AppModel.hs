@@ -16,6 +16,7 @@ module Model.AppModel
     , randomGenerator
     , autoRespond
     , responseMethod
+    , minimaxDepth
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -53,6 +54,7 @@ data AppModel = AppModel
     , _amRandomGenerator :: StdGen
     , _amAutoRespond :: Bool
     , _amResponseMethod :: ResponseMethod
+    , _amMinimaxDepth :: Int
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -69,6 +71,7 @@ initModel g = AppModel
     , _amRandomGenerator = g
     , _amAutoRespond = False
     , _amResponseMethod = RandomResponse
+    , _amMinimaxDepth = 3
     }
 
 isWhiteTurn :: AppModel -> Bool
@@ -105,8 +108,9 @@ calculateMove :: AppModel -> (Maybe Ply, StdGen)
 calculateMove model = (ply, g) where
     (ply, g) = case model ^. responseMethod of
         RandomResponse -> randomMove position rand
-        MinimaxResponse -> (minimaxMove position 3, rand)
+        MinimaxResponse -> (minimaxMove position depth, rand)
     position = model ^. chessPosition
+    depth = model ^. minimaxDepth
     rand = model ^. randomGenerator
 
 getPromotedPly

@@ -7,6 +7,7 @@ import Game.Chess
 import Monomer
 import Monomer.Checkerboard
 import Monomer.Dragboard
+import TextShow
 
 import Model
 
@@ -34,6 +35,9 @@ buildUI _ model = tree where
             , label "How to calculate next response:"
             , labeledRadio "Random" RandomResponse responseMethod
             , labeledRadio "Minimax" MinimaxResponse responseMethod
+            , separatorLine
+            , label $ "Depth: " <> (showt $ model ^. minimaxDepth)
+            , hslider_ minimaxDepth 1 6 [dragRate 1]
             ]
         ] `styleBasic` [padding 64]
     promotionMenu = vstack'
