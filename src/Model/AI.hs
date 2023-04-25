@@ -26,20 +26,37 @@ minimaxMove position depth
         minimaxBy = if white
             then maximumBy
             else minimumBy
-        f x = minimaxEval x depth
+        f x = alphabeta x depth (-100000) 100000
         white = color position == White
         next = (\x -> (x, unsafeDoPly position x)) <$> legal
         legal = legalPlies position
 
-minimaxEval :: Position -> Int -> Int
-minimaxEval position depth
+alphabeta :: Position -> Int -> Int -> Int -> Int
+alphabeta position depth a b
     | depth <= 0 = evaluatePosition position
-    | null next = if white then -1000 else 1000
-    | otherwise = if white then maximum evals else minimum evals
+    | null nextPositions = v
+    | otherwise = f nextPositions depth a b v
     where
-        evals = flip minimaxEval (depth-1) <$> next
-        next = unsafeDoPly position <$> legalPlies position
+        v = if white then -1000 else 1000
+        f = if white then alphabetaMaxi else alphabetaMini
+        nextPositions = unsafeDoPly position <$> legalPlies position
         white = color position == White
+
+alphabetaMaxi :: [Position] -> Int -> Int -> Int -> Int -> Int
+alphabetaMaxi [] _ _ _ v = v
+alphabetaMaxi (x:xs) depth a b v = result where
+    result = if value >= b
+        then value
+        else alphabetaMaxi xs depth (max a value) b value
+    value = max v $ alphabeta x (depth-1) a b
+
+alphabetaMini :: [Position] -> Int -> Int -> Int -> Int -> Int
+alphabetaMini [] _ _ _ v = v
+alphabetaMini (x:xs) depth a b v = result where
+    result = if value <= a
+        then value
+        else alphabetaMini xs depth a (min b value) value
+    value = min v $ alphabeta x (depth-1) a b
 
 evaluatePosition :: Position -> Int
 evaluatePosition position = sum $ f <$> squares where

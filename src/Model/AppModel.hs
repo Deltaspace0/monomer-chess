@@ -105,7 +105,7 @@ calculateMove :: AppModel -> (Maybe Ply, StdGen)
 calculateMove model = (ply, g) where
     (ply, g) = case model ^. responseMethod of
         RandomResponse -> randomMove position rand
-        MinimaxResponse -> (minimaxMove position 2, rand)
+        MinimaxResponse -> (minimaxMove position 3, rand)
     position = model ^. chessPosition
     rand = model ^. randomGenerator
 
