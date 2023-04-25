@@ -3,10 +3,12 @@ module Model.AppEvent
     , handleEvent
     ) where
 
+import Control.DeepSeq
 import Control.Lens
 import Data.Maybe
 import Game.Chess
 import Monomer
+import System.Random
 
 import Model.AppModel
 
@@ -20,10 +22,14 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
+    | AppResponseCalculated (Maybe Ply, StdGen)
     | AppUndoMove
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
+
+instance NFData Ply where
+    rnf x = x `seq` ()
 
 handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
@@ -36,6 +42,7 @@ handleEvent _ _ model event = case event of
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
+    AppResponseCalculated v -> responseCalculatedHandle v model
     AppUndoMove -> undoMoveHandle model
 
 resetBoardHandle :: EventHandle
@@ -58,25 +65,26 @@ syncBoardHandle model = [Model $ model & boardState .~ state] where
     r = model ^. boardRotated
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
-boardChangedHandle info model = response where
-    response = if model ^. autoQueen
-        then
-            [ setNextPly
-            , Event AppRunNextPly
-            , responseIf resp $ Event AppPlayNextResponse
-            ]
-        else
-            [ setNextPly
-            , Event $ if noPromotion
-                then AppRunNextPly
-                else AppSetPromotionMenu True
-            , responseIf (resp && noPromotion) $
-                Event AppPlayNextResponse
-            ]
-    setNextPly = Model $ model & nextPly .~ Just ply
-    ply = getPromotedPly model info Queen
-    noPromotion = null $ plyPromotion ply
-    resp = model ^. autoRespond
+boardChangedHandle info model
+    | model ^. calculatingResponse = [Event AppSyncBoard]
+    | model ^. autoQueen =
+        [ setNextPly
+        , Event AppRunNextPly
+        , responseIf resp $ Event AppPlayNextResponse
+        ]
+    | otherwise =
+        [ setNextPly
+        , Event $ if noPromotion
+            then AppRunNextPly
+            else AppSetPromotionMenu True
+        , responseIf (resp && noPromotion) $
+            Event AppPlayNextResponse
+        ]
+    where
+        setNextPly = Model $ model & nextPly .~ Just ply
+        ply = getPromotedPly model info Queen
+        noPromotion = null $ plyPromotion ply
+        resp = model ^. autoRespond
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
@@ -110,10 +118,22 @@ promoteHandle pieceType model = response where
 playNextResponseHandle :: EventHandle
 playNextResponseHandle model = response where
     response =
-        [ Model $ model & nextPly .~ ply & randomGenerator .~ g
-        , Event AppRunNextPly
+        [ Model $ model & calculatingResponse .~ True
+        , Task taskHandler
         ]
-    (ply, g) = calculateMove model
+    taskHandler = do
+        let result = calculateMove model
+        result `deepseq` pure ()
+        return $ AppResponseCalculated result
+
+responseCalculatedHandle :: (Maybe Ply, StdGen) -> EventHandle
+responseCalculatedHandle (ply, g) model =
+    [ Model $ model
+        & nextPly .~ ply
+        & randomGenerator .~ g
+        & calculatingResponse .~ False
+    , Event AppRunNextPly
+    ]
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model = response where

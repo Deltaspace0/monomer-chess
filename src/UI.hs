@@ -24,11 +24,16 @@ buildUI _ model = tree where
             ]
         , separatorLine
         , vstack'
-            [ button "Reset board" AppResetBoard
+            [ button "Reset board" AppResetBoard `nodeEnabled`
+                not (model ^. calculatingResponse)
             , button "Rotate board" AppRotateBoard
-            , button "Play next response" AppPlayNextResponse
-            , button "Undo move" AppUndoMove
-                `nodeEnabled` (model ^. previousPositions /= [])
+            , if model ^. calculatingResponse
+                then button "Thinking" AppInit `nodeEnabled` False
+                else button "Play next response" AppPlayNextResponse
+            , button "Undo move" AppUndoMove `nodeEnabled` all not
+                [ null $ model ^. previousPositions
+                , model ^. calculatingResponse
+                ]
             , separatorLine
             , labeledCheckbox "Auto promote to queen" autoQueen
             , labeledCheckbox "Auto respond" autoRespond

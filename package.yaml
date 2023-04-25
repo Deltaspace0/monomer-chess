@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/Delt
 dependencies:
 - base >= 4.7 && < 5
 - chessIO
+- deepseq
 - lens
 - monomer
 - monomer-widgets
@@ -34,6 +35,7 @@ default-extensions:
 
 ghc-options:
 - -Wall
+- -Wno-orphans
 - -Wcompat
 - -Widentities
 - -Wincomplete-record-updates

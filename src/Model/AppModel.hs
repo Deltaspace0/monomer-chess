@@ -17,6 +17,7 @@ module Model.AppModel
     , autoRespond
     , responseMethod
     , minimaxDepth
+    , calculatingResponse
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -55,6 +56,7 @@ data AppModel = AppModel
     , _amAutoRespond :: Bool
     , _amResponseMethod :: ResponseMethod
     , _amMinimaxDepth :: Int
+    , _amCalculatingResponse :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -72,6 +74,7 @@ initModel g = AppModel
     , _amAutoRespond = False
     , _amResponseMethod = RandomResponse
     , _amMinimaxDepth = 3
+    , _amCalculatingResponse = False
     }
 
 isWhiteTurn :: AppModel -> Bool
