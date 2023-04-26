@@ -19,6 +19,7 @@ module Model.AppModel
     , minimaxDepth
     , calculatingResponse
     , sanMoves
+    , forsythEdwards
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -32,7 +33,7 @@ module Model.AppModel
 import Control.Lens
 import Data.Maybe
 import Game.Chess
-import Data.Text (Text)
+import Data.Text (pack, Text)
 import System.Random
 import qualified Monomer as M
 
@@ -59,6 +60,7 @@ data AppModel = AppModel
     , _amMinimaxDepth :: Int
     , _amCalculatingResponse :: Bool
     , _amSanMoves :: Text
+    , _amForsythEdwards :: Text
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -78,6 +80,7 @@ initModel g = AppModel
     , _amMinimaxDepth = 3
     , _amCalculatingResponse = False
     , _amSanMoves = ""
+    , _amForsythEdwards = pack $ toFEN startpos
     }
 
 isWhiteTurn :: AppModel -> Bool

@@ -54,6 +54,7 @@ resetBoardHandle model =
         & chessPosition .~ startpos
         & previousPositions .~ []
         & sanMoves .~ ""
+        & forsythEdwards .~ pack (toFEN startpos)
     , Event AppSyncBoard
     ]
 
@@ -105,8 +106,10 @@ runNextPlyHandle model = response where
                 & chessPosition .~ fromJust newPosition
                 & previousPositions %~ ((currentPosition, moves):)
                 & sanMoves .~ newSanMoves
+                & forsythEdwards .~ newFEN
             , Event AppSyncBoard
             ]
+    newFEN = pack $ toFEN $ fromJust newPosition
     newPosition = unsafeDoPly currentPosition <$> ply
     newSanMoves = moves <> numberText <> " " <> san
     moves = model ^. sanMoves
@@ -157,6 +160,7 @@ undoMoveHandle model = response where
                 & chessPosition .~ previousPosition
                 & previousPositions .~ tail positions
                 & sanMoves .~ moves
+                & forsythEdwards .~ pack (toFEN previousPosition)
             , Event AppSyncBoard
             ]
     (previousPosition, moves) = head positions

@@ -28,6 +28,10 @@ buildUI _ model = tree where
                 [ label "Moves:"
                 , textField_ sanMoves [readOnly]
                 ]
+            , hstack'
+                [ label "FEN:"
+                , textField_ forsythEdwards [readOnly]
+                ]
             , separatorLine
             , buttonPanel
             , separatorLine
