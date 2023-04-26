@@ -30,7 +30,8 @@ buildUI _ model = tree where
                 ]
             , hstack'
                 [ label "FEN:"
-                , textField_ forsythEdwards [readOnly]
+                , textField forsythEdwards
+                , button "Load" AppLoadFEN
                 ]
             , separatorLine
             , buttonPanel

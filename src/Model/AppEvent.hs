@@ -6,7 +6,7 @@ module Model.AppEvent
 import Control.DeepSeq
 import Control.Lens
 import Data.Maybe
-import Data.Text (pack)
+import Data.Text (pack, unpack)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
@@ -27,6 +27,7 @@ data AppEvent
     | AppPlayNextResponse
     | AppResponseCalculated (Maybe Ply, StdGen)
     | AppUndoMove
+    | AppLoadFEN
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -47,6 +48,7 @@ handleEvent _ _ model event = case event of
     AppPlayNextResponse -> playNextResponseHandle model
     AppResponseCalculated v -> responseCalculatedHandle v model
     AppUndoMove -> undoMoveHandle model
+    AppLoadFEN -> loadFENHandle model
 
 resetBoardHandle :: EventHandle
 resetBoardHandle model =
@@ -165,3 +167,18 @@ undoMoveHandle model = response where
             ]
     (previousPosition, moves) = head positions
     positions = model ^. previousPositions
+
+loadFENHandle :: EventHandle
+loadFENHandle model = response where
+    response = if null newPosition
+        then []
+        else
+            [ Model $ model
+                & chessPosition .~ fromJust newPosition
+                & previousPositions .~ []
+                & sanMoves .~ ""
+                & forsythEdwards .~ newFEN
+            , Event AppSyncBoard
+            ]
+    newFEN = pack $ toFEN $ fromJust newPosition
+    newPosition = fromFEN $ unpack $ model ^. forsythEdwards
