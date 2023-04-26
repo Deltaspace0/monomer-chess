@@ -24,7 +24,12 @@ buildUI _ model = tree where
             ]
         , separatorLine
         , vstack'
-            [ button "Reset board" AppResetBoard `nodeEnabled`
+            [ hstack'
+                [ label "Moves:"
+                , textField_ sanMoves [readOnly]
+                ]
+            , separatorLine
+            , button "Reset board" AppResetBoard `nodeEnabled`
                 not (model ^. calculatingResponse)
             , button "Rotate board" AppRotateBoard
             , if model ^. calculatingResponse
@@ -45,7 +50,7 @@ buildUI _ model = tree where
             , label $ "Depth: " <> (showt $ model ^. minimaxDepth)
             , hslider_ minimaxDepth 1 6 [dragRate 1]
             ]
-        ] `styleBasic` [padding 64]
+        ] `styleBasic` [padding 16]
     promotionMenu = vstack'
         [ label "Promote to:"
         , checkerboard 2 2 promotionPieces `styleBasic`
@@ -68,7 +73,7 @@ buildUI _ model = tree where
             ]
     makeClickPiece (p, e) = box_ [onClick $ AppPromote e] $
         image_ ("assets/chess-pieces/" <> p <> ".png") [fitEither]
-    hstack' = hstack_ [childSpacing_ 64]
+    hstack' = hstack_ [childSpacing_ 16]
     vstack' = vstack_ [childSpacing_ 16]
     gameBoard = dragboard_ 8 8 boardState (getPathOrColor model)
         [ checkerConfig [lightColor gray]

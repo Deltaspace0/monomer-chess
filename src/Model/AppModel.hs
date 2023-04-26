@@ -18,6 +18,7 @@ module Model.AppModel
     , responseMethod
     , minimaxDepth
     , calculatingResponse
+    , sanMoves
     , initModel
     , isWhiteTurn
     , getBoardState
@@ -47,7 +48,7 @@ data ResponseMethod
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPreviousPositions :: [Position]
+    , _amPreviousPositions :: [(Position, Text)]
     , _amNextPly :: Maybe Ply
     , _amShowPromotionMenu :: Bool
     , _amAutoQueen :: Bool
@@ -57,6 +58,7 @@ data AppModel = AppModel
     , _amResponseMethod :: ResponseMethod
     , _amMinimaxDepth :: Int
     , _amCalculatingResponse :: Bool
+    , _amSanMoves :: Text
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -75,6 +77,7 @@ initModel g = AppModel
     , _amResponseMethod = RandomResponse
     , _amMinimaxDepth = 3
     , _amCalculatingResponse = False
+    , _amSanMoves = ""
     }
 
 isWhiteTurn :: AppModel -> Bool

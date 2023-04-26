@@ -6,9 +6,12 @@ module Model.AppEvent
 import Control.DeepSeq
 import Control.Lens
 import Data.Maybe
+import Data.Text (pack)
 import Game.Chess
+import Game.Chess.SAN
 import Monomer
 import System.Random
+import TextShow
 
 import Model.AppModel
 
@@ -50,6 +53,7 @@ resetBoardHandle model =
     [ Model $ model
         & chessPosition .~ startpos
         & previousPositions .~ []
+        & sanMoves .~ ""
     , Event AppSyncBoard
     ]
 
@@ -99,11 +103,20 @@ runNextPlyHandle model = response where
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions %~ (currentPosition:)
+                & previousPositions %~ ((currentPosition, moves):)
+                & sanMoves .~ newSanMoves
             , Event AppSyncBoard
             ]
-    newPosition = unsafeDoPly currentPosition <$> model ^. nextPly
+    newPosition = unsafeDoPly currentPosition <$> ply
+    newSanMoves = moves <> numberText <> " " <> san
+    moves = model ^. sanMoves
+    numberText = if color currentPosition == White
+        then (if moves == "" then "" else " ") <> number <> "."
+        else ""
+    number = showt $ moveNumber currentPosition
+    san = pack $ unsafeToSAN currentPosition $ fromJust ply
     currentPosition = model ^. chessPosition
+    ply = model ^. nextPly
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model = response where
@@ -141,8 +154,10 @@ undoMoveHandle model = response where
         then []
         else
             [ Model $ model
-                & chessPosition .~ head positions
+                & chessPosition .~ previousPosition
                 & previousPositions .~ tail positions
+                & sanMoves .~ moves
             , Event AppSyncBoard
             ]
+    (previousPosition, moves) = head positions
     positions = model ^. previousPositions
