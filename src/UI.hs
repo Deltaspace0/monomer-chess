@@ -29,16 +29,7 @@ buildUI _ model = tree where
                 , textField_ sanMoves [readOnly]
                 ]
             , separatorLine
-            , button "Reset board" AppResetBoard `nodeEnabled`
-                not (model ^. calculatingResponse)
-            , button "Rotate board" AppRotateBoard
-            , if model ^. calculatingResponse
-                then button "Thinking" AppInit `nodeEnabled` False
-                else button "Play next response" AppPlayNextResponse
-            , button "Undo move" AppUndoMove `nodeEnabled` all not
-                [ null $ model ^. previousPositions
-                , model ^. calculatingResponse
-                ]
+            , buttonPanel
             , separatorLine
             , labeledCheckbox "Auto promote to queen" autoQueen
             , labeledCheckbox "Auto respond" autoRespond
@@ -51,6 +42,22 @@ buildUI _ model = tree where
             , hslider_ minimaxDepth 1 6 [dragRate 1]
             ]
         ] `styleBasic` [padding 16]
+    buttonPanel = vstack'
+        [ hgrid'
+            [ button "Reset board" AppResetBoard `nodeEnabled`
+                not (model ^. calculatingResponse)
+            , button "Rotate board" AppRotateBoard
+            ]
+        , hgrid'
+            [ if model ^. calculatingResponse
+                then button "Thinking" AppInit `nodeEnabled` False
+                else button "Play next response" AppPlayNextResponse
+            , button "Undo move" AppUndoMove `nodeEnabled` all not
+                [ null $ model ^. previousPositions
+                , model ^. calculatingResponse
+                ]
+            ]
+        ]
     promotionMenu = vstack'
         [ label "Promote to:"
         , checkerboard 2 2 promotionPieces `styleBasic`
@@ -75,6 +82,7 @@ buildUI _ model = tree where
         image_ ("assets/chess-pieces/" <> p <> ".png") [fitEither]
     hstack' = hstack_ [childSpacing_ 16]
     vstack' = vstack_ [childSpacing_ 16]
+    hgrid' = hgrid_ [childSpacing_ 16]
     gameBoard = dragboard_ 8 8 boardState (getPathOrColor model)
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
