@@ -8,6 +8,8 @@ import Data.List (maximumBy, minimumBy)
 import Game.Chess
 import System.Random hiding (next)
 
+data PositionEval = PositionEval Position Int
+
 randomMove :: Position -> StdGen -> (Maybe Ply, StdGen)
 randomMove position randomGenerator = (ply, g) where
     ply = if null legal
@@ -28,21 +30,22 @@ minimaxMove position depth
             else minimumBy
         f x = alphabeta x depth (-100000) 100000
         white = color position == White
-        next = (\x -> (x, unsafeDoPly position x)) <$> legal
+        next = (\x -> (x, doPlyEval positionEval x)) <$> legal
+        positionEval = makePositionEval position
         legal = legalPlies position
 
-alphabeta :: Position -> Int -> Int -> Int -> Int
-alphabeta position depth a b
-    | depth <= 0 = evaluatePosition position
-    | null nextPositions = v
-    | otherwise = f nextPositions depth a b v
+alphabeta :: PositionEval -> Int -> Int -> Int -> Int
+alphabeta positionEval@(PositionEval p eval) depth a b
+    | depth <= 0 = eval
+    | null nextPositionEvals = v
+    | otherwise = f nextPositionEvals depth a b v
     where
         v = if white then -1000 else 1000
         f = if white then alphabetaMaxi else alphabetaMini
-        nextPositions = unsafeDoPly position <$> legalPlies position
-        white = color position == White
+        nextPositionEvals = doPlyEval positionEval <$> legalPlies p
+        white = color p == White
 
-alphabetaMaxi :: [Position] -> Int -> Int -> Int -> Int -> Int
+alphabetaMaxi :: [PositionEval] -> Int -> Int -> Int -> Int -> Int
 alphabetaMaxi [] _ _ _ v = v
 alphabetaMaxi (x:xs) depth a b v = result where
     result = if value >= b
@@ -50,13 +53,29 @@ alphabetaMaxi (x:xs) depth a b v = result where
         else alphabetaMaxi xs depth (max a value) b value
     value = max v $ alphabeta x (depth-1) a b
 
-alphabetaMini :: [Position] -> Int -> Int -> Int -> Int -> Int
+alphabetaMini :: [PositionEval] -> Int -> Int -> Int -> Int -> Int
 alphabetaMini [] _ _ _ v = v
 alphabetaMini (x:xs) depth a b v = result where
     result = if value <= a
         then value
         else alphabetaMini xs depth a (min b value) value
     value = min v $ alphabeta x (depth-1) a b
+
+makePositionEval :: Position -> PositionEval
+makePositionEval p = PositionEval p $ evaluatePosition p
+
+doPlyEval :: PositionEval -> Ply -> PositionEval
+doPlyEval (PositionEval p eval) ply = newPositionEval where
+    newPositionEval = PositionEval (unsafeDoPly p ply) newEval
+    newEval = eval-capturedEval+enPassantEval
+    capturedEval = evaluatePiece $ pieceAt p $ plyTarget ply
+    enPassantEval
+        | not ep = 0
+        | color p == White = 1
+        | otherwise = -1
+    ep = sourcePawn && enPassantSquare p == Just (plyTarget ply)
+    sourcePawn = sp `elem` [Just (White, Pawn), Just (Black, Pawn)]
+    sp = pieceAt p $ plySource ply
 
 evaluatePosition :: Position -> Int
 evaluatePosition position = sum $ f <$> squares where
