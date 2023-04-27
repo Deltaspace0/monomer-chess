@@ -16,9 +16,13 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _ model = tree where
     tree = hstack'
         [ zstack
-            [ box' $ gameBoard `styleBasic`
-                [ sizeReqW $ fixedSize 400
-                , sizeReqH $ fixedSize 400
+            [ vstack'
+                [ box' $ gameBoard `styleBasic`
+                    [ sizeReqW $ fixedSize 400
+                    , sizeReqH $ fixedSize 400
+                    ]
+                , separatorLine
+                , label gameTurnText
                 ]
             , widgetIf (model ^. showPromotionMenu) $
                 alert (AppSetPromotionMenu False) promotionMenu
@@ -99,6 +103,12 @@ buildUI _ model = tree where
         [ sizeReqW $ fixedSize 400
         , sizeReqH $ fixedSize 400
         ]
+    gameTurnText = if noLegalMoves
+        then "No legal moves"
+        else if color (model ^. chessPosition) == White
+            then "White's turn"
+            else "Black's turn"
+    noLegalMoves = null $ legalPlies $ model ^. chessPosition
     minimaxEvaluationText = if null eval
         then "..."
         else showt $ fromJust eval
