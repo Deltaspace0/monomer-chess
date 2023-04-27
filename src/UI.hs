@@ -63,6 +63,7 @@ buildUI _ model = tree where
             [ if model ^. calculatingResponse
                 then button "Thinking" AppInit `nodeEnabled` False
                 else button "Play next response" AppPlayNextResponse
+                    `nodeEnabled` (not noLegalMoves)
             , button "Undo move" AppUndoMove `nodeEnabled` all not
                 [ null $ model ^. previousPositions
                 , model ^. calculatingResponse
