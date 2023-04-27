@@ -17,6 +17,7 @@ module Model.AppModel
     , autoRespond
     , responseMethod
     , minimaxDepth
+    , minimaxEvaluation
     , calculatingResponse
     , sanMoves
     , forsythEdwards
@@ -58,6 +59,7 @@ data AppModel = AppModel
     , _amAutoRespond :: Bool
     , _amResponseMethod :: ResponseMethod
     , _amMinimaxDepth :: Int
+    , _amMinimaxEvaluation :: Maybe Int
     , _amCalculatingResponse :: Bool
     , _amSanMoves :: Text
     , _amForsythEdwards :: Text
@@ -78,6 +80,7 @@ initModel g = AppModel
     , _amAutoRespond = False
     , _amResponseMethod = RandomResponse
     , _amMinimaxDepth = 3
+    , _amMinimaxEvaluation = Nothing
     , _amCalculatingResponse = False
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
@@ -113,11 +116,13 @@ validateMove model info = valid where
     valid = getPromotedPly model info Queen `elem` legal
     legal = legalPlies $ model ^. chessPosition
 
-calculateMove :: AppModel -> (Maybe Ply, StdGen)
-calculateMove model = (ply, g) where
-    (ply, g) = case model ^. responseMethod of
-        RandomResponse -> randomMove position rand
-        MinimaxResponse -> (minimaxMove position depth, rand)
+calculateMove :: AppModel -> (Maybe Ply, StdGen, Maybe Int)
+calculateMove model = result where
+    result = case model ^. responseMethod of
+        RandomResponse -> (randomPly, nextRand, Nothing)
+        MinimaxResponse -> (minimaxPly, rand, Just eval)
+    (randomPly, nextRand) = randomMove position rand
+    (minimaxPly, eval) = minimaxMove position depth
     position = model ^. chessPosition
     depth = model ^. minimaxDepth
     rand = model ^. randomGenerator

@@ -18,19 +18,19 @@ randomMove position randomGenerator = (ply, g) where
     legal = legalPlies position
     (i, g) = randomR (0, length legal-1) randomGenerator
 
-minimaxMove :: Position -> Int -> Maybe Ply
+minimaxMove :: Position -> Int -> (Maybe Ply, Int)
 minimaxMove position depth
-    | depth <= 0 = Nothing
-    | null legal = Nothing
-    | otherwise = Just ply
+    | depth <= 0 = (Nothing, 0)
+    | null legal = (Nothing, 0)
+    | otherwise = (Just ply, eval)
     where
-        ply = fst $ minimaxBy (compare `on` f . snd) next
+        (ply, eval) = minimaxBy (compare `on` snd) next
         minimaxBy = if white
             then maximumBy
             else minimumBy
-        f x = alphabeta x depth (-100000) 100000
         white = color position == White
-        next = (\x -> (x, doPlyEval positionEval x)) <$> legal
+        next = (\x -> (x, f $ doPlyEval positionEval x)) <$> legal
+        f x = alphabeta x depth (-100000) 100000
         positionEval = makePositionEval position
         legal = legalPlies position
 

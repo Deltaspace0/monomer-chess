@@ -3,6 +3,7 @@ module UI
     ) where
 
 import Control.Lens
+import Data.Maybe
 import Game.Chess
 import Monomer
 import Monomer.Checkerboard
@@ -42,6 +43,7 @@ buildUI _ model = tree where
             , label "How to calculate next response:"
             , labeledRadio "Random" RandomResponse responseMethod
             , labeledRadio "Minimax" MinimaxResponse responseMethod
+            , label $ "Evaluation: " <> minimaxEvaluationText
             , separatorLine
             , label $ "Depth: " <> (showt $ model ^. minimaxDepth)
             , hslider_ minimaxDepth 1 6 [dragRate 1]
@@ -97,3 +99,7 @@ buildUI _ model = tree where
         [ sizeReqW $ fixedSize 400
         , sizeReqH $ fixedSize 400
         ]
+    minimaxEvaluationText = if null eval
+        then "..."
+        else showt $ fromJust eval
+    eval = model ^. minimaxEvaluation

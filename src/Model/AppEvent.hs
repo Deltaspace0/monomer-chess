@@ -25,7 +25,7 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
-    | AppResponseCalculated (Maybe Ply, StdGen)
+    | AppResponseCalculated (Maybe Ply, StdGen, Maybe Int)
     | AppUndoMove
     | AppLoadFEN
     deriving (Eq, Show)
@@ -55,6 +55,7 @@ resetBoardHandle model =
     [ Model $ model
         & chessPosition .~ startpos
         & previousPositions .~ []
+        & minimaxEvaluation .~ Nothing
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN startpos)
     , Event AppSyncBoard
@@ -144,11 +145,14 @@ playNextResponseHandle model = response where
         result `deepseq` pure ()
         return $ AppResponseCalculated result
 
-responseCalculatedHandle :: (Maybe Ply, StdGen) -> EventHandle
-responseCalculatedHandle (ply, g) model =
+responseCalculatedHandle
+    :: (Maybe Ply, StdGen, Maybe Int)
+    -> EventHandle
+responseCalculatedHandle (ply, g, eval) model =
     [ Model $ model
         & nextPly .~ ply
         & randomGenerator .~ g
+        & minimaxEvaluation .~ eval
         & calculatingResponse .~ False
     , Event AppRunNextPly
     ]
@@ -161,6 +165,7 @@ undoMoveHandle model = response where
             [ Model $ model
                 & chessPosition .~ previousPosition
                 & previousPositions .~ tail positions
+                & minimaxEvaluation .~ Nothing
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
             , Event AppSyncBoard
@@ -176,6 +181,7 @@ loadFENHandle model = response where
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
                 & previousPositions .~ []
+                & minimaxEvaluation .~ Nothing
                 & sanMoves .~ ""
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
