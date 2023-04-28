@@ -16,6 +16,7 @@ module Model.AppModel
     , randomGenerator
     , autoRespond
     , responseMethod
+    , mctsRuns
     , minimaxDepth
     , minimaxEvaluation
     , calculatingResponse
@@ -60,6 +61,7 @@ data AppModel = AppModel
     , _amRandomGenerator :: StdGen
     , _amAutoRespond :: Bool
     , _amResponseMethod :: ResponseMethod
+    , _amMctsRuns :: Int
     , _amMinimaxDepth :: Int
     , _amMinimaxEvaluation :: Maybe Int
     , _amCalculatingResponse :: Bool
@@ -82,6 +84,7 @@ initModel g = AppModel
     , _amRandomGenerator = g
     , _amAutoRespond = True
     , _amResponseMethod = MCTSResponse
+    , _amMctsRuns = 2000
     , _amMinimaxDepth = 4
     , _amMinimaxEvaluation = Nothing
     , _amCalculatingResponse = False
@@ -128,7 +131,7 @@ calculateMove model = result where
         MCTSResponse -> (mctsPly, mctsRand, Nothing)
     (randomPly, nextRand) = randomMove position rand
     (minimaxPly, eval) = minimaxMove position depth
-    (mctsPly, mctsRand) = mctsMove position rand
+    (mctsPly, mctsRand) = mctsMove position rand $ model ^. mctsRuns
     position = model ^. chessPosition
     depth = model ^. minimaxDepth
     rand = model ^. randomGenerator

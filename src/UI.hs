@@ -46,8 +46,16 @@ buildUI _ model = tree where
             , separatorLine
             , responseOptionsPanel
             , separatorLine
-            , label $ "Minimax depth: " <> (showt $ model ^. minimaxDepth)
-            , hslider_ minimaxDepth 1 20 [dragRate 1]
+            , hgrid'
+                [ label $ "Minimax depth: " <>
+                    (showt $ model ^. minimaxDepth)
+                , hslider_ minimaxDepth 1 20 [dragRate 1]
+                ]
+            , hgrid'
+                [ label $ "MCTS runs: " <>
+                    (showt $ model ^. mctsRuns)
+                , hslider_ mctsRuns 100 30000 [dragRate 1]
+                ]
             ]
         ] `styleBasic` [padding 16]
     buttonPanel = vstack'

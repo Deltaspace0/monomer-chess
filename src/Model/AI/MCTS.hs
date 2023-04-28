@@ -19,10 +19,10 @@ data Tree = Tree
 
 makeLensesWith abbreviatedFields 'Tree
 
-mctsMove :: Position -> StdGen -> (Maybe Ply, StdGen)
-mctsMove position randomGenerator = (ply, g) where
+mctsMove :: Position -> StdGen -> Int -> (Maybe Ply, StdGen)
+mctsMove position randomGenerator runs = (ply, g) where
     ply = snd <$> (getBestNode $ finalTree ^. childNodes)
-    (finalTree, g) = mctsRepeat tree randomGenerator 1000
+    (finalTree, g) = mctsRepeat tree randomGenerator runs
     tree = initializeTree position
 
 getBestNode :: [(Tree, Ply)] -> Maybe (Tree, Ply)
