@@ -19,6 +19,7 @@ module Model.AppModel
     , minimaxDepth
     , minimaxEvaluation
     , calculatingResponse
+    , thinkingAnimation
     , sanMoves
     , forsythEdwards
     , initModel
@@ -61,6 +62,7 @@ data AppModel = AppModel
     , _amMinimaxDepth :: Int
     , _amMinimaxEvaluation :: Maybe Int
     , _amCalculatingResponse :: Bool
+    , _amThinkingAnimation :: Text
     , _amSanMoves :: Text
     , _amForsythEdwards :: Text
     } deriving (Eq, Show)
@@ -82,6 +84,7 @@ initModel g = AppModel
     , _amMinimaxDepth = 4
     , _amMinimaxEvaluation = Nothing
     , _amCalculatingResponse = False
+    , _amThinkingAnimation = ""
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
     }

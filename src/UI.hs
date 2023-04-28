@@ -61,7 +61,8 @@ buildUI _ model = tree where
             ]
         , hgrid'
             [ if model ^. calculatingResponse
-                then button "Thinking" AppInit `nodeEnabled` False
+                then button (model ^. thinkingAnimation) AppInit
+                    `nodeEnabled` False
                 else button "Play next response" AppPlayNextResponse
                     `nodeEnabled` (not noLegalMoves)
             , button "Undo move" AppUndoMove `nodeEnabled` all not

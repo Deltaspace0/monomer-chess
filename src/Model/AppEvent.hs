@@ -3,6 +3,7 @@ module Model.AppEvent
     , handleEvent
     ) where
 
+import Control.Concurrent
 import Control.DeepSeq
 import Control.Lens
 import Data.Maybe
@@ -25,6 +26,7 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
+    | AppSetThinkingAnimation Int
     | AppResponseCalculated (Maybe Ply, StdGen, Maybe Int)
     | AppUndoMove
     | AppLoadFEN
@@ -46,6 +48,7 @@ handleEvent _ _ model event = case event of
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
+    AppSetThinkingAnimation v -> setThinkingAnimationHandle v model
     AppResponseCalculated v -> responseCalculatedHandle v model
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
@@ -138,12 +141,34 @@ playNextResponseHandle :: EventHandle
 playNextResponseHandle model = response where
     response =
         [ Model $ model & calculatingResponse .~ True
+        , Event $ AppSetThinkingAnimation 0
         , Task taskHandler
         ]
     taskHandler = do
         let result = calculateMove model
         result `deepseq` pure ()
         return $ AppResponseCalculated result
+
+setThinkingAnimationHandle :: Int -> EventHandle
+setThinkingAnimationHandle v model = response where
+    response = if model ^. calculatingResponse
+        then
+            [ Model $ model & thinkingAnimation .~ animation
+            , Task taskHandler
+            ]
+        else []
+    animation = animations!!(v `mod` length animations)
+    animations =
+        [ "_.~\"~._.~\"~. Thinking _.~\"~._.~\"~."
+        , "._.~\"~._.~\"~ Thinking ._.~\"~._.~\"~"
+        , "~._.~\"~._.~\" Thinking ~._.~\"~._.~\""
+        , "\"~._.~\"~._.~ Thinking \"~._.~\"~._.~"
+        , "~\"~._.~\"~._. Thinking ~\"~._.~\"~._."
+        , ".~\"~._.~\"~._ Thinking .~\"~._.~\"~._"
+        ]
+    taskHandler = do
+        threadDelay 50000
+        return $ AppSetThinkingAnimation $ v+1
 
 responseCalculatedHandle
     :: (Maybe Ply, StdGen, Maybe Int)
