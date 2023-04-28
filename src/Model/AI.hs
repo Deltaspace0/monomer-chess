@@ -3,10 +3,9 @@ module Model.AI
     , minimaxMove
     ) where
 
-import Data.Function
-import Data.List (maximumBy, minimumBy)
+import Data.List (sortOn)
 import Game.Chess
-import System.Random hiding (next)
+import System.Random
 
 data PositionEval = PositionEval Position Int
 
@@ -19,56 +18,80 @@ randomMove position randomGenerator = (ply, g) where
     (i, g) = randomR (0, length legal-1) randomGenerator
 
 minimaxMove :: Position -> Int -> (Maybe Ply, Int)
-minimaxMove position depth
-    | depth <= 0 = (Nothing, 0)
-    | null legal = (Nothing, 0)
-    | otherwise = (Just ply, eval)
-    where
-        (ply, eval) = minimaxBy (compare `on` snd) next
-        minimaxBy = if white
-            then maximumBy
-            else minimumBy
-        white = color position == White
-        next = (\x -> (x, f $ doPlyEval positionEval x)) <$> legal
-        f x = alphabeta x depth (-100000) 100000
-        positionEval = makePositionEval position
-        legal = legalPlies position
+minimaxMove position depth = result where
+    result = alphabeta positionEval depth (-1000) 1000
+    positionEval = makePositionEval position
 
-alphabeta :: PositionEval -> Int -> Int -> Int -> Int
-alphabeta positionEval@(PositionEval p eval) depth a b
-    | depth <= 0 = eval
-    | null nextPositionEvals = v
-    | otherwise = f nextPositionEvals depth a b v
-    where
-        v = if white then -1000 else 1000
-        f = if white then alphabetaMaxi else alphabetaMini
-        nextPositionEvals = doPlyEval positionEval <$> legalPlies p
-        white = color p == White
+alphabeta :: PositionEval -> Int -> Int -> Int -> (Maybe Ply, Int)
+alphabeta positionEval@(PositionEval p eval) depth a b = r where
+    r = if depth <= 0 || null nextPPE
+        then (Nothing, eval)
+        else f nextPPE depth a b v
+    v = (Nothing, if white then -100000 else 100000)
+    f = if white then alphabetaMaxi else alphabetaMini
+    nextPPE = sortOn forcingIndicator $ doPlies <$> legalPlies p
+    forcingIndicator :: (Ply, PositionEval) -> Int
+    forcingIndicator (ply, PositionEval nextPosition _)
+        | inCheck (color nextPosition) nextPosition = 0
+        | not (null $ plyPromotion ply) = 1
+        | not (null $ pieceAt p $ plyTarget ply) = 2
+        | otherwise = 3
+    doPlies x = (x, doPlyEval positionEval x)
+    white = color p == White
 
-alphabetaMaxi :: [PositionEval] -> Int -> Int -> Int -> Int -> Int
+alphabetaMaxi
+    :: [(Ply, PositionEval)]
+    -> Int
+    -> Int
+    -> Int
+    -> (Maybe Ply, Int)
+    -> (Maybe Ply, Int)
 alphabetaMaxi [] _ _ _ v = v
-alphabetaMaxi (x:xs) depth a b v = result where
-    result = if value >= b
+alphabetaMaxi ((ply', pe):xs) depth a b v@(_, e) = result where
+    result = if endEval > b
         then value
-        else alphabetaMaxi xs depth (max a value) b value
-    value = max v $ alphabeta x (depth-1) a b
+        else alphabetaMaxi xs depth a' b value
+    a' = max a endEval
+    value@(_, endEval) = if e >= abEval
+        then v
+        else (Just ply', abEval)
+    abEval = snd $ alphabeta pe (depth-1) a b
 
-alphabetaMini :: [PositionEval] -> Int -> Int -> Int -> Int -> Int
+alphabetaMini
+    :: [(Ply, PositionEval)]
+    -> Int
+    -> Int
+    -> Int
+    -> (Maybe Ply, Int)
+    -> (Maybe Ply, Int)
 alphabetaMini [] _ _ _ v = v
-alphabetaMini (x:xs) depth a b v = result where
-    result = if value <= a
+alphabetaMini ((ply', pe):xs) depth a b v@(_, e) = result where
+    result = if endEval < a
         then value
-        else alphabetaMini xs depth a (min b value) value
-    value = min v $ alphabeta x (depth-1) a b
+        else alphabetaMini xs depth a b' value
+    b' = min b endEval
+    value@(_, endEval) = if e <= abEval
+        then v
+        else (Just ply', abEval)
+    abEval = snd $ alphabeta pe (depth-1) a b
 
 makePositionEval :: Position -> PositionEval
-makePositionEval p = PositionEval p $ evaluatePosition p
+makePositionEval p = PositionEval p eval where
+    eval = evaluatePosition p + checkmateFactor p
 
 doPlyEval :: PositionEval -> Ply -> PositionEval
 doPlyEval (PositionEval p eval) ply = newPositionEval where
-    newPositionEval = PositionEval (unsafeDoPly p ply) newEval
-    newEval = eval-capturedEval+enPassantEval
-    capturedEval = evaluatePiece $ pieceAt p $ plyTarget ply
+    newPositionEval = PositionEval newPosition $ eval+(sum evals)
+    evals =
+        [ -(evaluatePiece $ pieceAt p $ plyTarget ply)
+        , checkmateFactor newPosition
+        , promotionEval
+        , enPassantEval
+        ]
+    promotionEval = if null promotedPiece
+        then 0
+        else evaluatePiece promotedPiece - evaluatePiece sp
+    promotedPiece = (\x -> (color p, x)) <$> plyPromotion ply
     enPassantEval
         | not ep = 0
         | color p == White = 1
@@ -76,6 +99,16 @@ doPlyEval (PositionEval p eval) ply = newPositionEval where
     ep = sourcePawn && enPassantSquare p == Just (plyTarget ply)
     sourcePawn = sp `elem` [Just (White, Pawn), Just (Black, Pawn)]
     sp = pieceAt p $ plySource ply
+    newPosition = unsafeDoPly p ply
+
+checkmateFactor :: Position -> Int
+checkmateFactor position = result where
+    result = if (null $ legalPlies position)
+        then 1000*side
+        else 0
+    side = if color position == White
+        then -1
+        else 1
 
 evaluatePosition :: Position -> Int
 evaluatePosition position = sum $ f <$> squares where
