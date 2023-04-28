@@ -27,6 +27,7 @@ library
   exposed-modules:
       Model
       Model.AI
+      Model.AI.Minimax
       Model.AppEvent
       Model.AppModel
       UI
