@@ -75,6 +75,7 @@ buildUI _ model = tree where
             [ labeledRadio "Minimax" MinimaxResponse responseMethod
             , label $ "Evaluation: " <> minimaxEvaluationText
             ]
+        , labeledRadio "MCTS" MCTSResponse responseMethod
         ]
     promotionMenu = vstack'
         [ label "Promote to:"

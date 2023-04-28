@@ -46,6 +46,7 @@ type Piece = (Color, PieceType)
 data ResponseMethod
     = RandomResponse
     | MinimaxResponse
+    | MCTSResponse
     deriving (Eq, Show)
 
 data AppModel = AppModel
@@ -124,8 +125,10 @@ calculateMove model = result where
     result = case model ^. responseMethod of
         RandomResponse -> (randomPly, nextRand, Nothing)
         MinimaxResponse -> (minimaxPly, rand, Just eval)
+        MCTSResponse -> (mctsPly, mctsRand, Nothing)
     (randomPly, nextRand) = randomMove position rand
     (minimaxPly, eval) = minimaxMove position depth
+    (mctsPly, mctsRand) = mctsMove position rand
     position = model ^. chessPosition
     depth = model ^. minimaxDepth
     rand = model ^. randomGenerator
