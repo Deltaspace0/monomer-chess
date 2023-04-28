@@ -44,13 +44,10 @@ buildUI _ model = tree where
             , labeledCheckbox "Auto promote to queen" autoQueen
             , labeledCheckbox "Auto respond" autoRespond
             , separatorLine
-            , label "How to calculate next response:"
-            , labeledRadio "Random" RandomResponse responseMethod
-            , labeledRadio "Minimax" MinimaxResponse responseMethod
-            , label $ "Evaluation: " <> minimaxEvaluationText
+            , responseOptionsPanel
             , separatorLine
-            , label $ "Depth: " <> (showt $ model ^. minimaxDepth)
-            , hslider_ minimaxDepth 1 6 [dragRate 1]
+            , label $ "Minimax depth: " <> (showt $ model ^. minimaxDepth)
+            , hslider_ minimaxDepth 1 20 [dragRate 1]
             ]
         ] `styleBasic` [padding 16]
     buttonPanel = vstack'
@@ -69,6 +66,14 @@ buildUI _ model = tree where
                 [ null $ model ^. previousPositions
                 , model ^. calculatingResponse
                 ]
+            ]
+        ]
+    responseOptionsPanel = vstack'
+        [ label "How to calculate next response:"
+        , labeledRadio "Random" RandomResponse responseMethod
+        , hstack'
+            [ labeledRadio "Minimax" MinimaxResponse responseMethod
+            , label $ "Evaluation: " <> minimaxEvaluationText
             ]
         ]
     promotionMenu = vstack'
