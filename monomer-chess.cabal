@@ -29,6 +29,7 @@ library
       Model.AI
       Model.AI.MCTS
       Model.AI.Minimax
+      Model.AI.PositionEval
       Model.AppEvent
       Model.AppModel
       UI
