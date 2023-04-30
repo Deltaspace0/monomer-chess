@@ -5,6 +5,7 @@ module Model.AppEvent
 
 import Control.Concurrent
 import Control.DeepSeq
+import Control.Exception
 import Control.Lens
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
@@ -208,8 +209,10 @@ undoMoveHandle model = response where
     positions = model ^. previousPositions
 
 loadFENHandle :: EventHandle
-loadFENHandle model = response where
-    response = if null newPosition
-        then []
-        else [Event $ AppSetPosition $ fromJust newPosition]
-    newPosition = fromFEN $ unpack $ model ^. forsythEdwards
+loadFENHandle model = [Task taskHandler] where
+    taskHandler = do
+        let newPosition = fromFEN $ unpack $ model ^. forsythEdwards
+            x = fromJust newPosition
+        catch (x `seq` return (AppSetPosition x)) f
+    f :: ErrorCall -> IO AppEvent
+    f = const $ return $ AppSetErrorMessage $ Just "Invalid FEN"
