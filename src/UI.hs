@@ -63,8 +63,8 @@ buildUI _ model = tree where
         ] `styleBasic` [padding 16]
     buttonPanel = vstack'
         [ hgrid'
-            [ button "Reset board" AppResetBoard `nodeEnabled`
-                not (model ^. calculatingResponse)
+            [ button "Reset board" (AppSetPosition startpos)
+                `nodeEnabled` not (model ^. calculatingResponse)
             , button "Rotate board" AppRotateBoard
             ]
         , hgrid'

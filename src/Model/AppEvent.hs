@@ -18,7 +18,7 @@ import Model.AppModel
 
 data AppEvent
     = AppInit
-    | AppResetBoard
+    | AppSetPosition Position
     | AppRotateBoard
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
@@ -41,7 +41,7 @@ instance NFData Ply where
 handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
     AppInit -> []
-    AppResetBoard -> resetBoardHandle model
+    AppSetPosition v -> setPositionHandle v model
     AppRotateBoard -> rotateBoardHandle model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
@@ -55,14 +55,14 @@ handleEvent _ _ model event = case event of
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
 
-resetBoardHandle :: EventHandle
-resetBoardHandle model =
+setPositionHandle :: Position -> EventHandle
+setPositionHandle position model =
     [ Model $ model
-        & chessPosition .~ startpos
+        & chessPosition .~ position
         & previousPositions .~ []
         & minimaxEvaluation .~ Nothing
         & sanMoves .~ ""
-        & forsythEdwards .~ pack (toFEN startpos)
+        & forsythEdwards .~ pack (toFEN position)
     , Event AppSyncBoard
     ]
 
@@ -211,14 +211,5 @@ loadFENHandle :: EventHandle
 loadFENHandle model = response where
     response = if null newPosition
         then []
-        else
-            [ Model $ model
-                & chessPosition .~ fromJust newPosition
-                & previousPositions .~ []
-                & minimaxEvaluation .~ Nothing
-                & sanMoves .~ ""
-                & forsythEdwards .~ newFEN
-            , Event AppSyncBoard
-            ]
-    newFEN = pack $ toFEN $ fromJust newPosition
+        else [Event $ AppSetPosition $ fromJust newPosition]
     newPosition = fromFEN $ unpack $ model ^. forsythEdwards
