@@ -11,6 +11,7 @@ module Model.AppModel
     , chessPosition
     , previousPositions
     , showPromotionMenu
+    , errorMessage
     , autoQueen
     , boardRotated
     , randomGenerator
@@ -56,6 +57,7 @@ data AppModel = AppModel
     , _amPreviousPositions :: [(Position, Text)]
     , _amNextPly :: Maybe Ply
     , _amShowPromotionMenu :: Bool
+    , _amErrorMessage :: Maybe Text
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
     , _amRandomGenerator :: StdGen
@@ -79,6 +81,7 @@ initModel g = AppModel
     , _amPreviousPositions = []
     , _amNextPly = Nothing
     , _amShowPromotionMenu = False
+    , _amErrorMessage = Nothing
     , _amAutoQueen = False
     , _amBoardRotated = False
     , _amRandomGenerator = g

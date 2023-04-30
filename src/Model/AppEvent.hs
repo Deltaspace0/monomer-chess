@@ -7,7 +7,7 @@ import Control.Concurrent
 import Control.DeepSeq
 import Control.Lens
 import Data.Maybe
-import Data.Text (pack, unpack)
+import Data.Text (pack, unpack, Text)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
@@ -23,6 +23,7 @@ data AppEvent
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
     | AppSetPromotionMenu Bool
+    | AppSetErrorMessage (Maybe Text)
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
@@ -45,6 +46,7 @@ handleEvent _ _ model event = case event of
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
+    AppSetErrorMessage v -> setErrorMessageHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
@@ -101,6 +103,13 @@ setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
     [ Model $ model & showPromotionMenu .~ v
     , Event AppSyncBoard
+    ]
+
+setErrorMessageHandle :: Maybe Text -> EventHandle
+setErrorMessageHandle v model =
+    [ Model $ model
+        & showPromotionMenu .~ False
+        & errorMessage .~ v
     ]
 
 runNextPlyHandle :: EventHandle

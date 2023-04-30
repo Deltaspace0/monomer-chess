@@ -26,6 +26,9 @@ buildUI _ model = tree where
                 ]
             , widgetIf (model ^. showPromotionMenu) $
                 alert (AppSetPromotionMenu False) promotionMenu
+            , widgetIf (not $ null $ model ^. errorMessage) $
+                alertMsg (fromMaybe "" $ model ^. errorMessage) $
+                    AppSetErrorMessage Nothing
             ]
         , separatorLine
         , vstack'
