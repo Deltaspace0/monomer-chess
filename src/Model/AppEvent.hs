@@ -104,7 +104,7 @@ boardChangedHandle info model
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
     [ Model $ model & showPromotionMenu .~ v
-    , Event AppSyncBoard
+    , responseIf v $ Event AppSyncBoard
     ]
 
 setErrorMessageHandle :: Maybe Text -> EventHandle
