@@ -61,6 +61,7 @@ setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
         & previousPositions .~ []
+        & showPromotionMenu .~ False
         & minimaxEvaluation .~ Nothing
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
@@ -121,6 +122,7 @@ runNextPlyHandle model = response where
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
                 & previousPositions %~ ((currentPosition, moves):)
+                & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
@@ -200,6 +202,7 @@ undoMoveHandle model = response where
             [ Model $ model
                 & chessPosition .~ previousPosition
                 & previousPositions .~ tail positions
+                & showPromotionMenu .~ False
                 & minimaxEvaluation .~ Nothing
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
