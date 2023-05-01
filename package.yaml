@@ -27,6 +27,7 @@ dependencies:
 - monomer
 - monomer-widgets
 - random
+- split
 - text
 - text-show
 

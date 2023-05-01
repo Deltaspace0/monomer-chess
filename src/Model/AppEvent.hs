@@ -23,6 +23,7 @@ data AppEvent
     | AppRotateBoard
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
+    | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
     | AppRunNextPly
@@ -32,6 +33,10 @@ data AppEvent
     | AppResponseCalculated (Maybe Ply, StdGen, Maybe Int)
     | AppUndoMove
     | AppLoadFEN
+    | AppApplyEditChanges
+    | AppClearEditBoard
+    | AppAddPiece Piece
+    | AppUpdateFEN
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -46,6 +51,7 @@ handleEvent _ _ model event = case event of
     AppRotateBoard -> rotateBoardHandle model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
+    AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
     AppRunNextPly -> runNextPlyHandle model
@@ -55,6 +61,10 @@ handleEvent _ _ model event = case event of
     AppResponseCalculated v -> responseCalculatedHandle v model
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
+    AppApplyEditChanges -> applyEditChangesHandle model
+    AppClearEditBoard -> clearEditBoardHandle model
+    AppAddPiece v -> addPieceHandle v model
+    AppUpdateFEN -> updateFenHandle model
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -70,14 +80,21 @@ setPositionHandle position model =
 
 rotateBoardHandle :: EventHandle
 rotateBoardHandle model =
-    [ Model $ model & boardRotated %~ not
-    , Event AppSyncBoard
+    [ Model $ model
+        & boardRotated %~ not
+        & boardState %~ reverse
+        & fenData . fenBoardState %~ reverse
     ]
 
 syncBoardHandle :: EventHandle
-syncBoardHandle model = [Model $ model & boardState .~ state] where
-    state = getBoardState r $ model ^. chessPosition
+syncBoardHandle model = response where
+    response =
+        [ Model $ model
+            & boardState .~ getBoardState r position
+            & fenData .~ getFenData r position
+        ]
     r = model ^. boardRotated
+    position = model ^. chessPosition
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info model
@@ -100,6 +117,14 @@ boardChangedHandle info model
         ply = getPromotedPly model info Queen
         noPromotion = null $ plyPromotion ply
         resp = model ^. autoRespond
+
+setEditMenuHandle :: Bool -> EventHandle
+setEditMenuHandle v model =
+    [ Model $ model
+        & showEditMenu .~ v
+        & showPromotionMenu .~ False
+        & errorMessage .~ Nothing
+    ]
 
 setPromotionMenuHandle :: Bool -> EventHandle
 setPromotionMenuHandle v model =
@@ -219,3 +244,33 @@ loadFENHandle model = [Task taskHandler] where
         catch (x `seq` return (AppSetPosition x)) f
     f :: ErrorCall -> IO AppEvent
     f = const $ return $ AppSetErrorMessage $ Just "Invalid FEN"
+
+applyEditChangesHandle :: EventHandle
+applyEditChangesHandle model =
+    [ Model $ model & showEditMenu .~ False
+    , Event AppLoadFEN
+    ]
+
+clearEditBoardHandle :: EventHandle
+clearEditBoardHandle model =
+    [ Model $ model & fenData . fenBoardState .~ take 64 (repeat [])
+    , Event AppUpdateFEN
+    ]
+
+addPieceHandle :: Piece -> EventHandle
+addPieceHandle piece model = response where
+    response =
+        [ Model $ model & fenData . fenBoardState %~ addPiece
+        , Event AppUpdateFEN
+        ]
+    addPiece [] = []
+    addPiece (x:xs) = if null x
+        then [piece]:xs
+        else x:(addPiece xs)
+
+updateFenHandle :: EventHandle
+updateFenHandle model = response where
+    response = [Model $ model & forsythEdwards .~ newFEN]
+    newFEN = pack $ toFEN $ fromJust $ fromFEN fenString
+    fenString = getFenString r $ model ^. fenData
+    r = model ^. boardRotated
