@@ -1,11 +1,8 @@
 # Monomer chess
-
-## Screenshots
 ![Screenshot](readme/screenshot1.png)
-![Screenshot](readme/screenshot2.png)
-![Screenshot](readme/screenshot3.png)
 
 ## Goals
+- To have a chess GUI written in Haskell.
 - To learn [Minimax](https://en.wikipedia.org/wiki/Minimax) (with [alpha-beta pruning](https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_pruning)) and [MCTS](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search) algorithms.
 
 ## Features
@@ -16,8 +13,19 @@
 - It is possible to play against computer and choose how it would
 calculate its response to your move:
     - **Random**: chooses randomly from all possible moves.
-    - **Minimax**: basic implementation with alpha-beta pruning and configurable depth, shows its evaluation (no quiescence search and other stuff implemented so evaluation is not accurate).
+    - **Minimax**: basic implementation with alpha-beta pruning and configurable depth, shows its evaluation (no [quiescence search](https://en.wikipedia.org/wiki/Quiescence_search) and other stuff implemented so evaluation is not accurate).
     - **MCTS**: Monte Carlo tree search with configurable number of runs, rollouts played randomly to the end of the game.
+
+![Screenshot](readme/screenshot2.png)
+
+- It possible to edit current position on the board (including whose turn it is now and castling rights):
+
+![Screenshot](readme/screenshot3.png)
+
+- Nice dialog window when a pawn promotes:
+
+![Screenshot](readme/screenshot4.png)
+
 
 ## License
 - This project is licensed under the [MIT license](LICENSE).
