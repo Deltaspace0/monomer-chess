@@ -61,44 +61,40 @@ buildUI _ model = tree where
                 ]
             ]
         , separatorLine
-        , labeledRadio' "White's turn" White $ fenData . fenTurn
-        , labeledRadio' "Black's turn" Black $ fenData . fenTurn
-        , separatorLine
-        , hgrid
-            [ box_ [alignLeft] $ vstack'
-                [ label "White:"
-                , labeledCheckbox' "O-O" $ fenData . fenCastleWK
-                , labeledCheckbox' "O-O-O" $ fenData . fenCastleWQ
-                ]
-            , box_ [alignRight] $ vstack'
-                [ label "Black:"
-                , labeledCheckbox' "O-O" $ fenData . fenCastleBK
-                , labeledCheckbox' "O-O-O" $ fenData . fenCastleBQ
-                ]
+        , hstack'
+            [ turnPanel
+            , separatorLine
+            , castlePanel
             ]
         , separatorLine
-        , label "Click on piece to put it on the board:"
-        , box' $ checkerboard 6 2 chessPieces `styleBasic`
+        , label "Drag pieces to put them on the board:"
+        , box' $ extraBoard `styleBasic`
             [ sizeReqW $ fixedSize 300
             , sizeReqH $ fixedSize 100
             ]
         ]
+    turnPanel = vstack'
+        [ labeledRadio' "White's turn" White $ fenData . fenTurn
+        , labeledRadio' "Black's turn" Black $ fenData . fenTurn
+        ]
+    castlePanel = hgrid'
+        [ vstack'
+            [ label "White:"
+            , labeledCheckbox' "O-O" $ fenData . fenCastleWK
+            , labeledCheckbox' "O-O-O" $ fenData . fenCastleWQ
+            ]
+        , vstack'
+            [ label "Black:"
+            , labeledCheckbox' "O-O" $ fenData . fenCastleBK
+            , labeledCheckbox' "O-O-O" $ fenData . fenCastleBQ
+            ]
+        ]
     labeledRadio' t v l = labeledRadio_ t v l [onChange updateR]
     labeledCheckbox' t l = labeledCheckbox_ t l [onChange updateC]
-    chessPieces = makeClickPiece AppAddPiece <$>
-        [ ("wP", (White, Pawn))
-        , ("wN", (White, Knight))
-        , ("wB", (White, Bishop))
-        , ("wR", (White, Rook))
-        , ("wQ", (White, Queen))
-        , ("wK", (White, King))
-        , ("bP", (Black, Pawn))
-        , ("bN", (Black, Knight))
-        , ("bB", (Black, Bishop))
-        , ("bR", (Black, Rook))
-        , ("bQ", (Black, Queen))
-        , ("bK", (Black, King))
-        ]
+    updateR :: Color -> AppEvent
+    updateR = const AppUpdateFEN
+    updateC :: Bool -> AppEvent
+    updateC = const AppUpdateFEN
     gameControlPanel = vstack'
         [ buttonPanel
         , separatorLine
@@ -180,15 +176,15 @@ buildUI _ model = tree where
         ]
     editBoard = dragboard_ 8 8 (fenData . fenBoardState) checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]
-        , onChange updateFenChecker
+        , onChange AppEditBoardChanged
         ]
+    extraBoard = dragboardD_ 6 2 pieceWidgetData checkerPath
+        [ checkerConfig [lightColor gray, darkColor darkGray]
+        , moveValidator $ const False
+        , dragIdOffset 1000
+        ] []
+    pieceWidgetData = WidgetValue chessPieces
     checkerPath = getPathOrColor model
-    updateFenChecker :: ([[Piece]], Int, Int) -> AppEvent
-    updateFenChecker = const AppUpdateFEN
-    updateR :: Color -> AppEvent
-    updateR = const AppUpdateFEN
-    updateC :: Bool -> AppEvent
-    updateC = const AppUpdateFEN
     box' x = box_ [alignMiddle, alignCenter] x `styleBasic`
         [ sizeReqW $ fixedSize 400
         ]

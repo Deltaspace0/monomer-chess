@@ -23,6 +23,7 @@ data AppEvent
     | AppRotateBoard
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
+    | AppEditBoardChanged ([[Piece]], Int, Int)
     | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
@@ -35,7 +36,6 @@ data AppEvent
     | AppLoadFEN
     | AppApplyEditChanges
     | AppClearEditBoard
-    | AppAddPiece Piece
     | AppUpdateFEN
     deriving (Eq, Show)
 
@@ -51,6 +51,7 @@ handleEvent _ _ model event = case event of
     AppRotateBoard -> rotateBoardHandle model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
+    AppEditBoardChanged info -> editBoardChangedHandle info model
     AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
@@ -63,7 +64,6 @@ handleEvent _ _ model event = case event of
     AppLoadFEN -> loadFENHandle model
     AppApplyEditChanges -> applyEditChangesHandle model
     AppClearEditBoard -> clearEditBoardHandle model
-    AppAddPiece v -> addPieceHandle v model
     AppUpdateFEN -> updateFenHandle model
 
 setPositionHandle :: Position -> EventHandle
@@ -117,6 +117,15 @@ boardChangedHandle info model
         ply = getPromotedPly model info Queen
         noPromotion = null $ plyPromotion ply
         resp = model ^. autoRespond
+
+editBoardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
+editBoardChangedHandle (_, ixTo, ixFrom) model = response where
+    response =
+        [ responseIf (ixFrom >= 1000) $ Model $ modify model
+        , Event AppUpdateFEN
+        ]
+    modify = fenData . fenBoardState . element ixTo .~ piece
+    piece = chessPieces!!(ixFrom-1000)
 
 setEditMenuHandle :: Bool -> EventHandle
 setEditMenuHandle v model =
@@ -256,17 +265,6 @@ clearEditBoardHandle model =
     [ Model $ model & fenData . fenBoardState .~ take 64 (repeat [])
     , Event AppUpdateFEN
     ]
-
-addPieceHandle :: Piece -> EventHandle
-addPieceHandle piece model = response where
-    response =
-        [ Model $ model & fenData . fenBoardState %~ addPiece
-        , Event AppUpdateFEN
-        ]
-    addPiece [] = []
-    addPiece (x:xs) = if null x
-        then [piece]:xs
-        else x:(addPiece xs)
 
 updateFenHandle :: EventHandle
 updateFenHandle model = response where

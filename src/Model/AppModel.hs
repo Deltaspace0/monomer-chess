@@ -33,6 +33,7 @@ module Model.AppModel
     , calculateMove
     , getPromotedPly
     , getPly
+    , chessPieces
     ) where
 
 import Control.Lens
@@ -114,9 +115,10 @@ getPathOrColor model (color, pieceType) = Left imagePath where
         Bishop -> "B"
         Rook -> "R"
         Queen -> "Q"
-        King -> if inCheck color (model ^. chessPosition)
+        King -> if check && not (model ^. showEditMenu)
             then "KC"
             else "K"
+    check = inCheck color (model ^. chessPosition)
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
 validateMove model info = valid where
@@ -155,3 +157,19 @@ promotePly model ply pieceType = newPly where
         else ply
     promotedPly = ply `promoteTo` pieceType
     legal = legalPlies $ model ^. chessPosition
+
+chessPieces :: [[Piece]]
+chessPieces =
+    [ [(White, Pawn)]
+    , [(White, Knight)]
+    , [(White, Bishop)]
+    , [(White, Rook)]
+    , [(White, Queen)]
+    , [(White, King)]
+    , [(Black, Pawn)]
+    , [(Black, Knight)]
+    , [(Black, Bishop)]
+    , [(Black, Rook)]
+    , [(Black, Queen)]
+    , [(Black, King)]
+    ]
