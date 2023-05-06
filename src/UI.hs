@@ -182,6 +182,7 @@ buildUI _ model = tree where
         [ checkerConfig [lightColor gray, darkColor darkGray]
         , moveValidator $ const False
         , dragIdOffset 1000
+        , disableClick
         ] []
     pieceWidgetData = WidgetValue chessPieces
     checkerPath = getPathOrColor model
