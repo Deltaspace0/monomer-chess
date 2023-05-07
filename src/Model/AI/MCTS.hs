@@ -59,7 +59,7 @@ monteCarloTreeSearch tree randomGenerator = r where
     (subTree, i) = selectChild tree
 
 selectChild :: Tree -> (Tree, Int)
-selectChild tree = f $ zipWith (,) subTrees [0..] where
+selectChild tree = f $ zip subTrees [0..] where
     f [] = error "No child nodes to select"
     f elems@(x@(Tree _ w s _, _):xs)
         | length elems == 1 || s == 0 = x
