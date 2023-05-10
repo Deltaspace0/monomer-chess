@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.AppModel
@@ -101,11 +102,11 @@ initModel g = AppModel
     }
 
 isWhiteTurn :: AppModel -> Bool
-isWhiteTurn model = color (model ^. chessPosition) == White
+isWhiteTurn AppModel{..} = color _amChessPosition == White
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color
-getPathOrColor model (color, pieceType) = Left imagePath where
-    imagePath = "assets/chess-pieces/" <> c <> p <> ".png"
+getPathOrColor AppModel{..} (color, pieceType) = result where
+    result = Left $ "assets/chess-pieces/" <> c <> p <> ".png"
     c = case color of
         White -> "w"
         Black -> "b"
@@ -115,28 +116,26 @@ getPathOrColor model (color, pieceType) = Left imagePath where
         Bishop -> "B"
         Rook -> "R"
         Queen -> "Q"
-        King -> if check && not (model ^. showEditMenu)
+        King -> if check && not _amShowEditMenu
             then "KC"
             else "K"
-    check = inCheck color (model ^. chessPosition)
+    check = inCheck color _amChessPosition
 
 validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
-validateMove model info = valid where
+validateMove model@(AppModel{..}) info = valid where
     valid = getPromotedPly model info Queen `elem` legal
-    legal = legalPlies $ model ^. chessPosition
+    legal = legalPlies _amChessPosition
 
 calculateMove :: AppModel -> (Maybe Ply, StdGen, Maybe Int)
-calculateMove model = result where
-    result = case model ^. responseMethod of
+calculateMove AppModel{..} = result where
+    result = case _amResponseMethod of
         RandomResponse -> (randomPly, nextRand, Nothing)
-        MinimaxResponse -> (minimaxPly, rand, Just eval)
+        MinimaxResponse -> (mmPly, rand, Just eval)
         MCTSResponse -> (mctsPly, mctsRand, Nothing)
-    (randomPly, nextRand) = randomMove position rand
-    (minimaxPly, eval) = minimaxMove position depth
-    (mctsPly, mctsRand) = mctsMove position rand $ model ^. mctsRuns
-    position = model ^. chessPosition
-    depth = model ^. minimaxDepth
-    rand = model ^. randomGenerator
+    (randomPly, nextRand) = randomMove _amChessPosition rand
+    (mmPly, eval) = minimaxMove _amChessPosition _amMinimaxDepth
+    (mctsPly, mctsRand) = mctsMove _amChessPosition rand _amMctsRuns
+    rand = _amRandomGenerator
 
 getPromotedPly
     :: AppModel
@@ -151,12 +150,12 @@ getPly r (_, ixTo, ixFrom) = move (f ixFrom) (f ixTo) where
     f = getSquare r
 
 promotePly :: AppModel -> Ply -> PieceType -> Ply
-promotePly model ply pieceType = newPly where
+promotePly AppModel{..} ply pieceType = newPly where
     newPly = if promotedPly `elem` legal
         then promotedPly
         else ply
     promotedPly = ply `promoteTo` pieceType
-    legal = legalPlies $ model ^. chessPosition
+    legal = legalPlies _amChessPosition
 
 chessPieces :: [[Piece]]
 chessPieces =

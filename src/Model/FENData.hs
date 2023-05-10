@@ -1,4 +1,5 @@
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.FENData
@@ -47,18 +48,18 @@ getFenData r position = FENData
         cs = castlingRights position
 
 getFenString :: Bool -> FENData -> String
-getFenString r fen = result where
+getFenString r FENData{..} = result where
     result = unwords [boardFen, turnFen, castleFen, "- 0 1"]
     boardFen = concat $ intersperse "/" $ chunksOf 8 $ if r
-        then pieceChar <$> reverse (fen ^. fenBoardState)
-        else pieceChar <$> fen ^. fenBoardState
-    turnFen = if fen ^. fenTurn == White then "w" else "b"
+        then pieceChar <$> reverse _fdFenBoardState
+        else pieceChar <$> _fdFenBoardState
+    turnFen = if _fdFenTurn == White then "w" else "b"
     castleFen = if null castles then "-" else castles
     castles = concat
-        [ if fen ^. fenCastleWK then "K" else ""
-        , if fen ^. fenCastleWQ then "Q" else ""
-        , if fen ^. fenCastleBK then "k" else ""
-        , if fen ^. fenCastleBQ then "q" else ""
+        [ if _fdFenCastleWK then "K" else ""
+        , if _fdFenCastleWQ then "Q" else ""
+        , if _fdFenCastleBK then "k" else ""
+        , if _fdFenCastleBQ then "q" else ""
         ]
 
 pieceChar :: [Piece] -> Char

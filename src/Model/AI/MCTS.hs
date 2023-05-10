@@ -1,8 +1,14 @@
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.AI.MCTS
-    ( mctsMove
+    ( Tree(..)
+    , rootPosition
+    , statWins
+    , statSimulations
+    , childNodes
+    , mctsMove
     ) where
 
 import Control.Lens
@@ -43,14 +49,14 @@ mctsRepeat tree randomGenerator n = result where
     (nextTree, g) = monteCarloTreeSearch tree randomGenerator
 
 monteCarloTreeSearch :: Tree -> StdGen -> (Tree, StdGen)
-monteCarloTreeSearch tree randomGenerator = r where
-    r = if tree ^. statSimulations == 0 || null (tree ^. childNodes)
+monteCarloTreeSearch tree@(Tree{..}) randomGenerator = r where
+    r = if _tStatSimulations == 0 || null _tChildNodes
         then (rolloutTree, gr)
         else (nextTree, g)
     rolloutTree = tree
         & statWins +~ rollout
         & statSimulations +~ 1
-    (rollout, gr) = doRollout (tree ^. rootPosition) randomGenerator
+    (rollout, gr) = doRollout _tRootPosition randomGenerator
     nextTree = tree
         & statWins +~ 1-(subTree' ^. statWins)+(subTree ^. statWins)
         & statSimulations +~ 1
@@ -59,7 +65,7 @@ monteCarloTreeSearch tree randomGenerator = r where
     (subTree, i) = selectChild tree
 
 selectChild :: Tree -> (Tree, Int)
-selectChild tree = f $ zip subTrees [0..] where
+selectChild Tree{..} = f $ zip subTrees [0..] where
     f [] = error "No child nodes to select"
     f elems@(x@(Tree _ w s _, _):xs)
         | length elems == 1 || s == 0 = x
@@ -68,8 +74,8 @@ selectChild tree = f $ zip subTrees [0..] where
         where
             x'@(Tree _ w' s' _, _) = f xs
     eval w s = let s' = fromIntegral s in w/s' + sqrt (n/s')
-    n = 2 * (log $ fromIntegral $ tree ^. statSimulations)
-    subTrees = fst <$> tree ^. childNodes
+    n = 2 * (log $ fromIntegral _tStatSimulations)
+    subTrees = fst <$> _tChildNodes
 
 doRollout :: Position -> StdGen -> (Double, StdGen)
 doRollout position randomGenerator = result where

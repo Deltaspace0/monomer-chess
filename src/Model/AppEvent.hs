@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Model.AppEvent
     ( AppEvent(..)
     , handleEvent
@@ -87,36 +89,34 @@ rotateBoardHandle model =
     ]
 
 syncBoardHandle :: EventHandle
-syncBoardHandle model = response where
+syncBoardHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & boardState .~ getBoardState r position
-            & fenData .~ getFenData r position
+            & boardState .~ getBoardState r _amChessPosition
+            & fenData .~ getFenData r _amChessPosition
         ]
-    r = model ^. boardRotated
-    position = model ^. chessPosition
+    r = _amBoardRotated
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
-boardChangedHandle info model
-    | model ^. calculatingResponse = [Event AppSyncBoard]
-    | model ^. autoQueen =
+boardChangedHandle info model@(AppModel{..})
+    | _amCalculatingResponse = [Event AppSyncBoard]
+    | _amAutoQueen =
         [ setNextPly
         , Event AppRunNextPly
-        , responseIf resp $ Event AppPlayNextResponse
+        , responseIf _amAutoRespond $ Event AppPlayNextResponse
         ]
     | otherwise =
         [ setNextPly
         , Event $ if noPromotion
             then AppRunNextPly
             else AppSetPromotionMenu True
-        , responseIf (resp && noPromotion) $
+        , responseIf (_amAutoRespond && noPromotion) $
             Event AppPlayNextResponse
         ]
     where
         setNextPly = Model $ model & nextPly .~ Just ply
         ply = getPromotedPly model info Queen
         noPromotion = null $ plyPromotion ply
-        resp = model ^. autoRespond
 
 editBoardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 editBoardChangedHandle (_, ixTo, ixFrom) model = response where
@@ -149,39 +149,36 @@ setErrorMessageHandle v model =
     ]
 
 runNextPlyHandle :: EventHandle
-runNextPlyHandle model = response where
+runNextPlyHandle model@(AppModel{..}) = response where
     response = if null newPosition
         then []
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions %~ ((currentPosition, moves):)
+                & previousPositions %~ ((_amChessPosition, moves):)
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
             ]
     newFEN = pack $ toFEN $ fromJust newPosition
-    newPosition = unsafeDoPly currentPosition <$> ply
+    newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
     newSanMoves = moves <> numberText <> " " <> san
-    moves = model ^. sanMoves
-    numberText = if color currentPosition == White
+    moves = _amSanMoves
+    numberText = if color _amChessPosition == White
         then (if moves == "" then "" else " ") <> number <> "."
         else ""
-    number = showt $ moveNumber currentPosition
-    san = pack $ unsafeToSAN currentPosition $ fromJust ply
-    currentPosition = model ^. chessPosition
-    ply = model ^. nextPly
+    number = showt $ moveNumber _amChessPosition
+    san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
 
 promoteHandle :: PieceType -> EventHandle
-promoteHandle pieceType model = response where
+promoteHandle pieceType model@(AppModel{..}) = response where
     response =
         [ Model $ model & nextPly %~ ((`promoteTo` pieceType) <$>)
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
-        , responseIf resp $ Event AppPlayNextResponse
+        , responseIf _amAutoRespond $ Event AppPlayNextResponse
         ]
-    resp = model ^. autoRespond
 
 playNextResponseHandle :: EventHandle
 playNextResponseHandle model = response where
@@ -196,8 +193,8 @@ playNextResponseHandle model = response where
         return $ AppResponseCalculated result
 
 setThinkingAnimationHandle :: Int -> EventHandle
-setThinkingAnimationHandle v model = response where
-    response = if model ^. calculatingResponse
+setThinkingAnimationHandle v model@(AppModel{..}) = response where
+    response = if _amCalculatingResponse
         then
             [ Model $ model & thinkingAnimation .~ animation
             , Task taskHandler
@@ -229,26 +226,25 @@ responseCalculatedHandle (ply, g, eval) model =
     ]
 
 undoMoveHandle :: EventHandle
-undoMoveHandle model = response where
-    response = if null positions
+undoMoveHandle model@(AppModel{..}) = response where
+    response = if null _amPreviousPositions
         then []
         else
             [ Model $ model
                 & chessPosition .~ previousPosition
-                & previousPositions .~ tail positions
+                & previousPositions .~ tail _amPreviousPositions
                 & showPromotionMenu .~ False
                 & minimaxEvaluation .~ Nothing
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
             , Event AppSyncBoard
             ]
-    (previousPosition, moves) = head positions
-    positions = model ^. previousPositions
+    (previousPosition, moves) = head _amPreviousPositions
 
 loadFENHandle :: EventHandle
-loadFENHandle model = [Task taskHandler] where
+loadFENHandle AppModel{..} = [Task taskHandler] where
     taskHandler = do
-        let newPosition = fromFEN $ unpack $ model ^. forsythEdwards
+        let newPosition = fromFEN $ unpack _amForsythEdwards
             x = fromJust newPosition
         catch (x `seq` return (AppSetPosition x)) f
     f :: ErrorCall -> IO AppEvent
@@ -267,8 +263,7 @@ clearEditBoardHandle model =
     ]
 
 updateFenHandle :: EventHandle
-updateFenHandle model = response where
+updateFenHandle model@(AppModel{..}) = response where
     response = [Model $ model & forsythEdwards .~ newFEN]
     newFEN = pack $ toFEN $ fromJust $ fromFEN fenString
-    fenString = getFenString r $ model ^. fenData
-    r = model ^. boardRotated
+    fenString = getFenString _amBoardRotated _amFenData

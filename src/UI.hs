@@ -1,8 +1,9 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module UI
     ( buildUI
     ) where
 
-import Control.Lens
 import Data.Maybe
 import Game.Chess
 import Monomer hiding (Color)
@@ -13,7 +14,7 @@ import TextShow
 import Model
 
 buildUI :: UIBuilder AppModel AppEvent
-buildUI _ model = tree where
+buildUI _ model@(AppModel{..}) = tree where
     tree = hstack'
         [ zstack
             [ vstack'
@@ -22,17 +23,17 @@ buildUI _ model = tree where
                     , sizeReqH $ fixedSize 400
                     ]
                 , separatorLine
-                , if model ^. showEditMenu
+                , if _amShowEditMenu
                     then box_ [alignRight] editButton
                     else zstack
                         [ label gameTurnText
                         , box_ [alignRight] editButton
                         ]
                 ]
-            , widgetIf (model ^. showPromotionMenu) $
+            , widgetIf _amShowPromotionMenu $
                 alert (AppSetPromotionMenu False) promotionMenu
-            , widgetIf (not $ null $ model ^. errorMessage) $
-                alertMsg (fromMaybe "" $ model ^. errorMessage) $
+            , widgetIf (not $ null _amErrorMessage) $
+                alertMsg (fromMaybe "" _amErrorMessage) $
                     AppSetErrorMessage Nothing
             ]
         , separatorLine
@@ -47,7 +48,7 @@ buildUI _ model = tree where
                 , button "Load" AppLoadFEN
                 ]
             , separatorLine
-            , if model ^. showEditMenu
+            , if _amShowEditMenu
                 then editControlPanel
                 else gameControlPanel
             ]
@@ -104,32 +105,31 @@ buildUI _ model = tree where
         , responseOptionsPanel
         , separatorLine
         , hgrid'
-            [ label $ "Minimax depth: " <>
-                (showt $ model ^. minimaxDepth)
+            [ label $ "Minimax depth: " <> (showt _amMinimaxDepth)
             , hslider_ minimaxDepth 1 20 [dragRate 1]
             ]
         , hgrid'
-            [ label $ "MCTS runs: " <> (showt $ model ^. mctsRuns)
+            [ label $ "MCTS runs: " <> (showt _amMctsRuns)
             , hslider_ mctsRuns 100 30000 [dragRate 1]
             ]
         ]
     buttonPanel = vstack'
         [ resetRotateButtons
         , hgrid'
-            [ if model ^. calculatingResponse
-                then button (model ^. thinkingAnimation) AppInit
+            [ if _amCalculatingResponse
+                then button _amThinkingAnimation AppInit
                     `nodeEnabled` False
                 else button "Play next response" AppPlayNextResponse
                     `nodeEnabled` (not noLegalMoves)
             , button "Undo move" AppUndoMove `nodeEnabled` all not
-                [ null $ model ^. previousPositions
-                , model ^. calculatingResponse
+                [ null _amPreviousPositions
+                , _amCalculatingResponse
                 ]
             ]
         ]
     resetRotateButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
-            `nodeEnabled` not (model ^. calculatingResponse)
+            `nodeEnabled` not _amCalculatingResponse
         , button "Rotate board" AppRotateBoard
         ]
     responseOptionsPanel = vstack'
@@ -166,7 +166,7 @@ buildUI _ model = tree where
     hstack' = hstack_ [childSpacing_ 16]
     vstack' = vstack_ [childSpacing_ 16]
     hgrid' = hgrid_ [childSpacing_ 16]
-    chessBoard = if model ^. showEditMenu
+    chessBoard = if _amShowEditMenu
         then editBoard
         else gameBoard
     gameBoard = dragboard_ 8 8 boardState checkerPath
@@ -191,15 +191,14 @@ buildUI _ model = tree where
         ]
     gameTurnText = if noLegalMoves
         then "No legal moves"
-        else if color (model ^. chessPosition) == White
+        else if color _amChessPosition == White
             then "White's turn"
             else "Black's turn"
-    editButton = (if model ^. showEditMenu
+    editButton = (if _amShowEditMenu
         then button "Go back" $ AppSetEditMenu False
         else button "Edit position" $ AppSetEditMenu True)
-            `nodeEnabled` not (model ^. calculatingResponse)
-    noLegalMoves = null $ legalPlies $ model ^. chessPosition
-    minimaxEvaluationText = if null eval
+            `nodeEnabled` not _amCalculatingResponse
+    noLegalMoves = null $ legalPlies _amChessPosition
+    minimaxEvaluationText = if null _amMinimaxEvaluation
         then "..."
-        else showt $ fromJust eval
-    eval = model ^. minimaxEvaluation
+        else showt $ fromJust _amMinimaxEvaluation
