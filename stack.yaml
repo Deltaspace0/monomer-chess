@@ -42,10 +42,11 @@ packages:
 #
 extra-deps:
 - chessIO-0.9.3.1
-- monomer-1.5.1.0
+- git: https://github.com/Deltaspace0/monomer.git
+  commit: fdb3b086e91c30b2a5b9db68fe133929959573e0
 - nanovg-0.8.1.0
 - git: https://github.com/Deltaspace0/monomer-widgets.git
-  commit: 4b9938ff17499194472fb2f5395e20ab85b88483
+  commit: 134606bd92468a7fdadc296fbc5ec8823c927b9c
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
