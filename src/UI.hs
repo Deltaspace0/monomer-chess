@@ -183,6 +183,7 @@ buildUI _ model@(AppModel{..}) = tree where
         , moveValidator $ const False
         , dragIdOffset 1000
         , disableClick
+        , renderSource
         ] []
     pieceWidgetData = WidgetValue chessPieces
     checkerPath = getPathOrColor model
