@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Composites
+      Composites.FlagPanel
       Composites.ThinkButton
       Model
       Model.AI

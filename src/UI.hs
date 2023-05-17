@@ -63,11 +63,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 ]
             ]
         , separatorLine
-        , hstack'
-            [ turnPanel
-            , separatorLine
-            , castlePanel
-            ]
+        , flagPanel fenData AppUpdateFEN
         , separatorLine
         , label "Drag pieces to put them on the board:"
         , box' $ extraBoard `styleBasic`
@@ -75,28 +71,6 @@ buildUI _ model@(AppModel{..}) = tree where
             , sizeReqH $ fixedSize 100
             ]
         ]
-    turnPanel = vstack'
-        [ labeledRadio' "White's turn" White $ fenData . fenTurn
-        , labeledRadio' "Black's turn" Black $ fenData . fenTurn
-        ]
-    castlePanel = hgrid'
-        [ vstack'
-            [ label "White:"
-            , labeledCheckbox' "O-O" $ fenData . fenCastleWK
-            , labeledCheckbox' "O-O-O" $ fenData . fenCastleWQ
-            ]
-        , vstack'
-            [ label "Black:"
-            , labeledCheckbox' "O-O" $ fenData . fenCastleBK
-            , labeledCheckbox' "O-O-O" $ fenData . fenCastleBQ
-            ]
-        ]
-    labeledRadio' t v l = labeledRadio_ t v l [onChange updateR]
-    labeledCheckbox' t l = labeledCheckbox_ t l [onChange updateC]
-    updateR :: Color -> AppEvent
-    updateR = const AppUpdateFEN
-    updateC :: Bool -> AppEvent
-    updateC = const AppUpdateFEN
     gameControlPanel = vstack'
         [ buttonPanel
         , separatorLine

@@ -1,5 +1,7 @@
 module Composites
-    ( module Composites.ThinkButton
+    ( module Composites.FlagPanel
+    , module Composites.ThinkButton
     ) where
 
+import Composites.FlagPanel
 import Composites.ThinkButton
