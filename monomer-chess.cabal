@@ -25,6 +25,8 @@ source-repository head
 
 library
   exposed-modules:
+      Composites
+      Composites.ThinkButton
       Model
       Model.AI
       Model.AI.MCTS

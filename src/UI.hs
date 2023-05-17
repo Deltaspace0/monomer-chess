@@ -11,6 +11,7 @@ import Monomer.Checkerboard
 import Monomer.Dragboard
 import TextShow
 
+import Composites
 import Model
 
 buildUI :: UIBuilder AppModel AppEvent
@@ -117,8 +118,7 @@ buildUI _ model@(AppModel{..}) = tree where
         [ resetRotateButtons
         , hgrid'
             [ if _amCalculatingResponse
-                then button _amThinkingAnimation AppInit
-                    `nodeEnabled` False
+                then thinkButton
                 else button "Play next response" AppPlayNextResponse
                     `nodeEnabled` (not noLegalMoves)
             , button "Undo move" AppUndoMove `nodeEnabled` all not
