@@ -19,7 +19,7 @@ buildUI _ model@(AppModel{..}) = tree where
     tree = hstack'
         [ zstack
             [ vstack'
-                [ box' $ chessBoard `styleBasic`
+                [ box' $ chessBoardLeft `styleBasic`
                     [ sizeReqW $ fixedSize 400
                     , sizeReqH $ fixedSize 400
                     ]
@@ -38,7 +38,18 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ]
         , separatorLine
-        , vstack'
+        , rightPanel
+        ] `styleBasic` [padding 16]
+    rightPanel = vstack' $ if _amShowTwoBoards
+        then
+            [ box' $ chessBoardRight `styleBasic`
+                [ sizeReqW $ fixedSize 400
+                , sizeReqH $ fixedSize 400
+                ]
+            , separatorLine
+            , buttonPanel
+            ]
+        else
             [ hstack'
                 [ label "Moves:"
                 , textField_ sanMoves [readOnly]
@@ -53,15 +64,8 @@ buildUI _ model@(AppModel{..}) = tree where
                 then editControlPanel
                 else gameControlPanel
             ]
-        ] `styleBasic` [padding 16]
     editControlPanel = vstack'
-        [ vstack'
-            [ resetRotateButtons
-            , hgrid'
-                [ button "Apply changes" AppApplyEditChanges
-                , button "Clear board" AppClearEditBoard
-                ]
-            ]
+        [ buttonPanel
         , separatorLine
         , flagPanel fenData AppUpdateFEN
         , separatorLine
@@ -88,23 +92,33 @@ buildUI _ model@(AppModel{..}) = tree where
             , hslider_ mctsRuns 100 30000 [dragRate 1]
             ]
         ]
-    buttonPanel = vstack'
-        [ resetRotateButtons
-        , hgrid'
-            [ if _amCalculatingResponse
-                then thinkButton
-                else button "Play next response" AppPlayNextResponse
-                    `nodeEnabled` (not noLegalMoves)
-            , button "Undo move" AppUndoMove `nodeEnabled` all not
-                [ null _amPreviousPositions
-                , _amCalculatingResponse
+    buttonPanel = vstack' $ if _amShowEditMenu
+        then
+            [ resetRotateButtons
+            , hgrid'
+                [ button "Apply changes" AppApplyEditChanges
+                , button "Clear board" AppClearEditBoard
                 ]
+            , toggleButton "Show two boards" showTwoBoards
             ]
-        ]
+        else
+            [ resetRotateButtons
+            , hgrid'
+                [ if _amCalculatingResponse
+                    then thinkButton
+                    else button "Play next response" AppPlayNextResponse
+                        `nodeEnabled` (not noLegalMoves)
+                , button "Undo move" AppUndoMove `nodeEnabled` all not
+                    [ null _amPreviousPositions
+                    , _amCalculatingResponse
+                    ]
+                ]
+            , toggleButton "Show two boards" showTwoBoards
+            ]
     resetRotateButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
             `nodeEnabled` not _amCalculatingResponse
-        , button "Rotate board" AppRotateBoard
+        , toggleButton "Rotate board" boardRotated
         ]
     responseOptionsPanel = vstack'
         [ label "How to calculate next response:"
@@ -140,17 +154,29 @@ buildUI _ model@(AppModel{..}) = tree where
     hstack' = hstack_ [childSpacing_ 16]
     vstack' = vstack_ [childSpacing_ 16]
     hgrid' = hgrid_ [childSpacing_ 16]
-    chessBoard = if _amShowEditMenu
-        then editBoard
-        else gameBoard
+    (chessBoardLeft, chessBoardRight) = if _amBoardRotated
+        then (chessBoardR, chessBoard)
+        else (chessBoard, chessBoardR)
+    (chessBoard, chessBoardR) = if _amShowEditMenu
+        then (editBoard, editBoardR)
+        else (gameBoard, gameBoardR)
     gameBoard = dragboard_ 8 8 boardState checkerPath
         [ checkerConfig [lightColor gray]
-        , moveValidator $ validateMove model
-        , onChange AppBoardChanged
+        , moveValidator $ validateMove model False
+        , onChange $ AppBoardChanged False
+        ]
+    gameBoardR = dragboard_ 8 8 boardStateReversed checkerPath
+        [ checkerConfig [lightColor gray]
+        , moveValidator $ validateMove model True
+        , onChange $ AppBoardChanged True
         ]
     editBoard = dragboard_ 8 8 (fenData . fenBoardState) checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]
-        , onChange AppEditBoardChanged
+        , onChange $ AppEditBoardChanged False
+        ]
+    editBoardR = dragboard_ 8 8 (fenData . fenBoardStateReversed) checkerPath
+        [ checkerConfig [lightColor gray, darkColor darkGray]
+        , onChange $ AppEditBoardChanged True
         ]
     extraBoard = dragboardD_ 6 2 pieceWidgetData checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]

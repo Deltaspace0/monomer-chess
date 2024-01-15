@@ -21,10 +21,9 @@ import Model.AppModel
 data AppEvent
     = AppInit
     | AppSetPosition Position
-    | AppRotateBoard
     | AppSyncBoard
-    | AppBoardChanged ([[Piece]], Int, Int)
-    | AppEditBoardChanged ([[Piece]], Int, Int)
+    | AppBoardChanged Bool ([[Piece]], Int, Int)
+    | AppEditBoardChanged Bool ([[Piece]], Int, Int)
     | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
@@ -48,10 +47,9 @@ handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
     AppInit -> []
     AppSetPosition v -> setPositionHandle v model
-    AppRotateBoard -> rotateBoardHandle model
     AppSyncBoard -> syncBoardHandle model
-    AppBoardChanged info -> boardChangedHandle info model
-    AppEditBoardChanged info -> editBoardChangedHandle info model
+    AppBoardChanged r info -> boardChangedHandle r info model
+    AppEditBoardChanged r info -> editBoardChangedHandle r info model
     AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
@@ -77,25 +75,17 @@ setPositionHandle position model =
     , Event AppSyncBoard
     ]
 
-rotateBoardHandle :: EventHandle
-rotateBoardHandle model =
-    [ Model $ model
-        & boardRotated %~ not
-        & boardState %~ reverse
-        & fenData . fenBoardState %~ reverse
-    ]
-
 syncBoardHandle :: EventHandle
 syncBoardHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & boardState .~ getBoardState r _amChessPosition
-            & fenData .~ getFenData r _amChessPosition
+            & boardState .~ getBoardState False _amChessPosition
+            & boardStateReversed .~ getBoardState True _amChessPosition
+            & fenData .~ getFenData _amChessPosition
         ]
-    r = _amBoardRotated
 
-boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
-boardChangedHandle info model@(AppModel{..})
+boardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
+boardChangedHandle r info model@(AppModel{..})
     | _amCalculatingResponse = [Event AppSyncBoard]
     | _amAutoQueen =
         [ setNextPly
@@ -112,16 +102,26 @@ boardChangedHandle info model@(AppModel{..})
         ]
     where
         setNextPly = Model $ model & nextPly .~ Just ply
-        ply = getPromotedPly model info Queen
+        ply = getPromotedPly model r info Queen
         noPromotion = null $ plyPromotion ply
 
-editBoardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
-editBoardChangedHandle (_, ixTo, ixFrom) model = response where
+editBoardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
+editBoardChangedHandle r (_, ixTo, ixFrom) model = response where
     response =
-        [ responseIf (ixFrom >= 1000) $ Model $ modify model
+        [ responseIf (ixFrom >= 1000) $ Model newModel
+        , Model $ if r
+            then interModel & fenData . fenBoardState .~
+                reverse (interModel ^. fenData . fenBoardStateReversed)
+            else interModel & fenData . fenBoardStateReversed .~
+                reverse (interModel ^. fenData . fenBoardState)
         , Event AppUpdateFEN
         ]
-    modify = fenData . fenBoardState . element ixTo .~ piece
+    newModel = if r
+        then model & fenData . fenBoardStateReversed . element ixTo .~ piece
+        else model & fenData . fenBoardState . element ixTo .~ piece
+    interModel = if ixFrom >= 1000
+        then newModel
+        else model
     piece = chessPieces!!(ixFrom-1000)
 
 setEditMenuHandle :: Bool -> EventHandle
@@ -233,12 +233,13 @@ applyEditChangesHandle model =
 
 clearEditBoardHandle :: EventHandle
 clearEditBoardHandle model =
-    [ Model $ model & fenData . fenBoardState .~ take 64 (repeat [])
+    [ Model $ model
+        & fenData . fenBoardState .~ take 64 (repeat [])
+        & fenData . fenBoardStateReversed .~ take 64 (repeat [])
     , Event AppUpdateFEN
     ]
 
 updateFenHandle :: EventHandle
 updateFenHandle model@(AppModel{..}) = response where
     response = [Model $ model & forsythEdwards .~ newFEN]
-    newFEN = pack $ toFEN $ fromJust $ fromFEN fenString
-    fenString = getFenString _amBoardRotated _amFenData
+    newFEN = pack $ toFEN $ fromJust $ fromFEN $ getFenString _amFenData

@@ -8,9 +8,11 @@ module Model.AppModel
     , ResponseMethod(..)
     , AppModel(..)
     , boardState
+    , boardStateReversed
     , nextPly
     , chessPosition
     , previousPositions
+    , showTwoBoards
     , showEditMenu
     , showPromotionMenu
     , errorMessage
@@ -53,9 +55,11 @@ data ResponseMethod
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
+    , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
     , _amPreviousPositions :: [(Position, Text)]
     , _amNextPly :: Maybe Ply
+    , _amShowTwoBoards :: Bool
     , _amShowEditMenu :: Bool
     , _amShowPromotionMenu :: Bool
     , _amErrorMessage :: Maybe Text
@@ -78,9 +82,11 @@ makeLensesWith abbreviatedFields 'AppModel
 initModel :: StdGen -> AppModel
 initModel g = AppModel
     { _amBoardState = getBoardState False startpos
+    , _amBoardStateReversed = getBoardState True startpos
     , _amChessPosition = startpos
     , _amPreviousPositions = []
     , _amNextPly = Nothing
+    , _amShowTwoBoards = False
     , _amShowEditMenu = False
     , _amShowPromotionMenu = False
     , _amErrorMessage = Nothing
@@ -95,7 +101,7 @@ initModel g = AppModel
     , _amCalculatingResponse = False
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
-    , _amFenData = getFenData False startpos
+    , _amFenData = getFenData startpos
     }
 
 isWhiteTurn :: AppModel -> Bool
@@ -118,9 +124,9 @@ getPathOrColor AppModel{..} (color, pieceType) = result where
             else "K"
     check = inCheck color _amChessPosition
 
-validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
-validateMove model@(AppModel{..}) info = valid where
-    valid = getPromotedPly model info Queen `elem` legal
+validateMove :: AppModel -> Bool -> ([[Piece]], Int, Int) -> Bool
+validateMove model@(AppModel{..}) r info = valid where
+    valid = getPromotedPly model r info Queen `elem` legal
     legal = legalPlies _amChessPosition
 
 calculateMove :: AppModel -> (Maybe Ply, StdGen, Maybe Int)
@@ -136,11 +142,11 @@ calculateMove AppModel{..} = result where
 
 getPromotedPly
     :: AppModel
+    -> Bool
     -> ([[Piece]], Int, Int)
     -> PieceType
     -> Ply
-getPromotedPly model info = promotePly model ply where
-    ply = getPly (model ^. boardRotated) info
+getPromotedPly model r info = promotePly model $ getPly r info
 
 getPly :: Bool -> ([[Piece]], Int, Int) -> Ply
 getPly r (_, ixTo, ixFrom) = move (f ixFrom) (f ixTo) where

@@ -7,6 +7,7 @@ module Model.FENData
     ( Piece
     , FENData(..)
     , fenBoardState
+    , fenBoardStateReversed
     , fenTurn
     , fenCastleWK
     , fenCastleWQ
@@ -28,6 +29,7 @@ type Piece = (Color, PieceType)
 
 data FENData = FENData
     { _fdFenBoardState :: [[Piece]]
+    , _fdFenBoardStateReversed :: [[Piece]]
     , _fdFenTurn :: Color
     , _fdFenCastleWK :: Bool
     , _fdFenCastleWQ :: Bool
@@ -37,9 +39,10 @@ data FENData = FENData
 
 makeLensesWith abbreviatedFields 'FENData
 
-getFenData :: Bool -> Position -> FENData
-getFenData r position = FENData
-    { _fdFenBoardState = getBoardState r position
+getFenData :: Position -> FENData
+getFenData position = FENData
+    { _fdFenBoardState = getBoardState False position
+    , _fdFenBoardStateReversed = getBoardState True position
     , _fdFenTurn = color position
     , _fdFenCastleWK = (White, Kingside) `elem` cs
     , _fdFenCastleWQ = (White, Queenside) `elem` cs
@@ -48,12 +51,11 @@ getFenData r position = FENData
     } where
         cs = castlingRights position
 
-getFenString :: Bool -> FENData -> String
-getFenString r FENData{..} = result where
+getFenString :: FENData -> String
+getFenString FENData{..} = result where
     result = unwords [boardFen, turnFen, castleFen, "- 0 1"]
-    boardFen = concat $ intersperse "/" $ chunksOf 8 $ if r
-        then pieceChar <$> reverse _fdFenBoardState
-        else pieceChar <$> _fdFenBoardState
+    boardFen = concat $ intersperse "/" $ chunksOf 8 $
+        pieceChar <$> _fdFenBoardState
     turnFen = if _fdFenTurn == White then "w" else "b"
     castleFen = if null castles then "-" else castles
     castles = concat
