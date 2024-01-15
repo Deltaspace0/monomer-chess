@@ -12,15 +12,15 @@ packages:
   original:
     hackage: chessIO-0.9.3.1
 - completed:
-    commit: 081801ed525e88677825d65056ced68a53a38dd1
+    commit: 58b08083e3abc5ada70460fb1b12fb6d2abfbcbf
     git: https://github.com/Deltaspace0/monomer.git
     name: monomer
     pantry-tree:
-      sha256: ffa380239f746b1a8e8e961c179e1afa0cd6017e48d1d1f280801dfd04315203
+      sha256: 0fbd2432159124a5b4f0f3fe961f3ff6ec33844302ef1462767592ab9a60e788
       size: 18557
-    version: 1.5.1.0
+    version: 1.6.0.0
   original:
-    commit: 081801ed525e88677825d65056ced68a53a38dd1
+    commit: 58b08083e3abc5ada70460fb1b12fb6d2abfbcbf
     git: https://github.com/Deltaspace0/monomer.git
 - completed:
     hackage: nanovg-0.8.1.0@sha256:9131db15822c6593aa73946b56593eb0a14a0d044395bcdfd4fe2d3e6edb6759,4742

@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Composites.FlagPanel
     ( flagPanel
     ) where
