@@ -11,7 +11,8 @@ main = do
     g <- newStdGen
     let model = initModel g
         config =
-            [ appWindowState $ MainWindowNormal (1000, 640)
+            [ appWindowState $ MainWindowNormal (864, 640)
+            , appWindowResizable False
             , appWindowTitle "Monomer chess"
             , appTheme darkTheme
             , appFontDef "Regular" "./assets/font/laconic.otf"
