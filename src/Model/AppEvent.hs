@@ -143,7 +143,7 @@ setErrorMessageHandle v model =
 
 runNextPlyHandle :: EventHandle
 runNextPlyHandle model@(AppModel{..}) = response where
-    response = if null newPosition
+    response = if null newPosition || not isLegal
         then []
         else
             [ Model $ model
@@ -154,6 +154,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
             ]
+    isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
     newFEN = pack $ toFEN $ fromJust newPosition
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
     newSanMoves = moves <> numberText <> " " <> san
