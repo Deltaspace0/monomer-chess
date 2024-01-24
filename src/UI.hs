@@ -9,7 +9,6 @@ import Game.Chess
 import Monomer hiding (Color)
 import Monomer.Checkerboard
 import Monomer.Dragboard
-import TextShow
 
 import Composites
 import Model
@@ -81,16 +80,7 @@ buildUI _ model@(AppModel{..}) = tree where
         , labeledCheckbox "Auto promote to queen" autoQueen
         , labeledCheckbox "Auto respond" autoRespond
         , separatorLine
-        , responseOptionsPanel
-        , separatorLine
-        , hgrid'
-            [ label $ "Minimax depth: " <> (showt _amMinimaxDepth)
-            , hslider_ minimaxDepth 1 20 [dragRate 1]
-            ]
-        , hgrid'
-            [ label $ "MCTS runs: " <> (showt _amMctsRuns)
-            , hslider_ mctsRuns 100 30000 [dragRate 1]
-            ]
+        , aiPanel aiData
         ]
     buttonPanel = vstack' $ if _amShowEditMenu
         then
@@ -119,15 +109,6 @@ buildUI _ model@(AppModel{..}) = tree where
         [ button "Reset board" (AppSetPosition startpos)
             `nodeEnabled` not _amCalculatingResponse
         , toggleButton "Rotate board" boardRotated
-        ]
-    responseOptionsPanel = vstack'
-        [ label "How to calculate next response:"
-        , labeledRadio "Random" RandomResponse responseMethod
-        , hstack'
-            [ labeledRadio "Minimax" MinimaxResponse responseMethod
-            , label $ "Evaluation: " <> minimaxEvaluationText
-            ]
-        , labeledRadio "MCTS" MCTSResponse responseMethod
         ]
     promotionMenu = vstack'
         [ label "Promote to:"
@@ -200,6 +181,3 @@ buildUI _ model@(AppModel{..}) = tree where
         else button "Edit position" $ AppSetEditMenu True)
             `nodeEnabled` not _amCalculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
-    minimaxEvaluationText = if null _amMinimaxEvaluation
-        then "..."
-        else showt $ fromJust _amMinimaxEvaluation

@@ -4,8 +4,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.AppModel
-    ( module Model.FENData
-    , ResponseMethod(..)
+    ( module Model.AI
+    , module Model.FENData
     , AppModel(..)
     , boardState
     , boardStateReversed
@@ -18,21 +18,16 @@ module Model.AppModel
     , errorMessage
     , autoQueen
     , boardRotated
-    , randomGenerator
     , autoRespond
-    , responseMethod
-    , mctsRuns
-    , minimaxDepth
-    , minimaxEvaluation
     , calculatingResponse
     , sanMoves
     , forsythEdwards
     , fenData
+    , aiData
     , initModel
     , isWhiteTurn
     , getPathOrColor
     , validateMove
-    , calculateMove
     , getPromotedPly
     , getPly
     , chessPieces
@@ -47,12 +42,6 @@ import qualified Monomer as M
 import Model.AI
 import Model.FENData
 
-data ResponseMethod
-    = RandomResponse
-    | MinimaxResponse
-    | MCTSResponse
-    deriving (Eq, Show)
-
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
@@ -65,16 +54,12 @@ data AppModel = AppModel
     , _amErrorMessage :: Maybe Text
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
-    , _amRandomGenerator :: StdGen
     , _amAutoRespond :: Bool
-    , _amResponseMethod :: ResponseMethod
-    , _amMctsRuns :: Int
-    , _amMinimaxDepth :: Int
-    , _amMinimaxEvaluation :: Maybe Int
     , _amCalculatingResponse :: Bool
     , _amSanMoves :: Text
     , _amForsythEdwards :: Text
     , _amFenData :: FENData
+    , _amAiData :: AIData
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -92,16 +77,12 @@ initModel g = AppModel
     , _amErrorMessage = Nothing
     , _amAutoQueen = False
     , _amBoardRotated = False
-    , _amRandomGenerator = g
     , _amAutoRespond = True
-    , _amResponseMethod = MCTSResponse
-    , _amMctsRuns = 2000
-    , _amMinimaxDepth = 4
-    , _amMinimaxEvaluation = Nothing
     , _amCalculatingResponse = False
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
     , _amFenData = getFenData startpos
+    , _amAiData = initAI g
     }
 
 isWhiteTurn :: AppModel -> Bool
@@ -128,17 +109,6 @@ validateMove :: AppModel -> Bool -> ([[Piece]], Int, Int) -> Bool
 validateMove model@(AppModel{..}) r info = valid where
     valid = getPromotedPly model r info Queen `elem` legal
     legal = legalPlies _amChessPosition
-
-calculateMove :: AppModel -> (Maybe Ply, StdGen, Maybe Int)
-calculateMove AppModel{..} = result where
-    result = case _amResponseMethod of
-        RandomResponse -> (randomPly, nextRand, Nothing)
-        MinimaxResponse -> (mmPly, rand, Just eval)
-        MCTSResponse -> (mctsPly, mctsRand, Nothing)
-    (randomPly, nextRand) = randomMove _amChessPosition rand
-    (mmPly, eval) = minimaxMove _amChessPosition _amMinimaxDepth
-    (mctsPly, mctsRand) = mctsMove _amChessPosition rand _amMctsRuns
-    rand = _amRandomGenerator
 
 getPromotedPly
     :: AppModel

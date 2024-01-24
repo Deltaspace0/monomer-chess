@@ -13,7 +13,6 @@ import Data.Text (pack, unpack, Text)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
-import System.Random
 import TextShow
 
 import Model.AppModel
@@ -30,7 +29,7 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
-    | AppResponseCalculated (Maybe Ply, StdGen, Maybe Int)
+    | AppResponseCalculated AIData
     | AppUndoMove
     | AppLoadFEN
     | AppApplyEditChanges
@@ -39,9 +38,6 @@ data AppEvent
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
-
-instance NFData Ply where
-    rnf x = x `seq` ()
 
 handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
@@ -69,9 +65,9 @@ setPositionHandle position model =
         & chessPosition .~ position
         & previousPositions .~ []
         & showPromotionMenu .~ False
-        & minimaxEvaluation .~ Nothing
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
+        & aiData . minimaxEvaluation .~ Nothing
     , Event AppSyncBoard
     ]
 
@@ -178,25 +174,22 @@ promoteHandle pieceType model@(AppModel{..}) = response where
         ]
 
 playNextResponseHandle :: EventHandle
-playNextResponseHandle model = response where
+playNextResponseHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model & calculatingResponse .~ True
         , Task taskHandler
         ]
     taskHandler = do
-        let result = calculateMove model
+        let result = calculateMove _amChessPosition _amAiData
         result `deepseq` pure ()
         return $ AppResponseCalculated result
 
-responseCalculatedHandle
-    :: (Maybe Ply, StdGen, Maybe Int)
-    -> EventHandle
-responseCalculatedHandle (ply, g, eval) model =
+responseCalculatedHandle :: AIData -> EventHandle
+responseCalculatedHandle newData@(AIData{..}) model =
     [ Model $ model
-        & nextPly .~ ply
-        & randomGenerator .~ g
-        & minimaxEvaluation .~ eval
+        & nextPly .~ _adResponsePly
         & calculatingResponse .~ False
+        & aiData .~ newData
     , Event AppRunNextPly
     ]
 
@@ -209,9 +202,9 @@ undoMoveHandle model@(AppModel{..}) = response where
                 & chessPosition .~ previousPosition
                 & previousPositions .~ tail _amPreviousPositions
                 & showPromotionMenu .~ False
-                & minimaxEvaluation .~ Nothing
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
+                & aiData . minimaxEvaluation .~ Nothing
             , Event AppSyncBoard
             ]
     (previousPosition, moves) = head _amPreviousPositions
