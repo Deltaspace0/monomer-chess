@@ -22,22 +22,26 @@ aiPanel field = node where
 buildUI :: UIBuilder AIData ()
 buildUI _ AIData{..} = tree where
     tree = vstack_ [childSpacing_ 16]
-        [ label "How to calculate next response:"
-        , labeledRadio "Random" RandomResponse responseMethod
-        , hstack_ [childSpacing_ 16]
-            [ labeledRadio "Minimax" MinimaxResponse responseMethod
-            , label $ "Evaluation: " <> minimaxEvaluationText
+        [ hgrid_ [childSpacing_ 16]
+            [ label "How to calculate:"
+            , textDropdownS responseMethod
+                [ RandomResponse
+                , MinimaxResponse
+                , MCTSResponse
+                ]
             ]
-        , labeledRadio "MCTS" MCTSResponse responseMethod
-        , separatorLine
-        , hgrid_ [childSpacing_ 16]
-            [ label $ "Minimax depth: " <> (showt _adMinimaxDepth)
-            , hslider_ minimaxDepth 1 20 [dragRate 1]
-            ]
-        , hgrid_ [childSpacing_ 16]
-            [ label $ "MCTS runs: " <> (showt _adMctsRuns)
-            , hslider_ mctsRuns 100 30000 [dragRate 1]
-            ]
+        , widgetIf (_adResponseMethod == MinimaxResponse) $
+            hgrid_ [childSpacing_ 16]
+                [ label $ "Minimax depth: " <> (showt _adMinimaxDepth)
+                , hslider_ minimaxDepth 1 20 [dragRate 1]
+                ]
+        , widgetIf (_adResponseMethod == MCTSResponse) $
+            hgrid_ [childSpacing_ 16]
+                [ label $ "MCTS runs: " <> (showt _adMctsRuns)
+                , hslider_ mctsRuns 100 30000 [dragRate 1]
+                ]
+        , widgetIf (_adResponseMethod == MinimaxResponse) $
+            label $ "Evaluation: " <> minimaxEvaluationText
         ]
     minimaxEvaluationText = if null _adMinimaxEvaluation
         then "..."

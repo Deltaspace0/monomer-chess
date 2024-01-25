@@ -186,7 +186,7 @@ playNextResponseHandle model@(AppModel{..}) = response where
         return $ AppResponseCalculated result
 
 responseCalculatedHandle :: AIData -> EventHandle
-responseCalculatedHandle newData@(AIData{..}) model =
+responseCalculatedHandle AIData{..} model =
     [ Model $ model
         & nextPly .~ _adResponsePly
         & calculatingResponse .~ False

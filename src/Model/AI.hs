@@ -28,7 +28,12 @@ data ResponseMethod
     = RandomResponse
     | MinimaxResponse
     | MCTSResponse
-    deriving (Eq, Show, Generic)
+    deriving (Eq, Generic)
+
+instance Show ResponseMethod where
+    show RandomResponse = "Random moves"
+    show MinimaxResponse = "Minimax"
+    show MCTSResponse = "Monte Carlo tree search"
 
 data AIData = AIData
     { _adResponseMethod :: ResponseMethod
