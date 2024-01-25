@@ -40,9 +40,6 @@ buildUI _ AIData{..} = tree where
                 [ label $ "MCTS runs: " <> (showt _adMctsRuns)
                 , hslider_ mctsRuns 100 30000 [dragRate 1]
                 ]
-        , widgetIf (_adResponseMethod == MinimaxResponse) $
-            label $ "Evaluation: " <> minimaxEvaluationText
+        , widgetIf (not $ null _adPositionEvaluation) $
+            label $ "Evaluation: " <> fromMaybe "" _adPositionEvaluation
         ]
-    minimaxEvaluationText = if null _adMinimaxEvaluation
-        then "..."
-        else showt $ fromJust _adMinimaxEvaluation

@@ -67,7 +67,7 @@ setPositionHandle position model =
         & showPromotionMenu .~ False
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
-        & aiData . minimaxEvaluation .~ Nothing
+        & aiData . positionEvaluation .~ Nothing
     , Event AppSyncBoard
     ]
 
@@ -190,7 +190,7 @@ responseCalculatedHandle AIData{..} model =
     [ Model $ model
         & nextPly .~ _adResponsePly
         & calculatingResponse .~ False
-        & aiData . minimaxEvaluation .~ _adMinimaxEvaluation
+        & aiData . positionEvaluation .~ _adPositionEvaluation
     , Event AppRunNextPly
     ]
 
@@ -205,7 +205,7 @@ undoMoveHandle model@(AppModel{..}) = response where
                 & showPromotionMenu .~ False
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
-                & aiData . minimaxEvaluation .~ Nothing
+                & aiData . positionEvaluation .~ Nothing
             , Event AppSyncBoard
             ]
     (previousPosition, moves) = head _amPreviousPositions
