@@ -26,6 +26,7 @@ dependencies:
 - lens
 - monomer
 - monomer-widgets
+- process
 - random
 - split
 - text

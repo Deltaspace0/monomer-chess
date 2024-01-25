@@ -35,7 +35,7 @@ buildUI _ model@(AppModel{..}) = tree where
             , widgetIf (not $ null _amErrorMessage) $
                 alertMsg (fromMaybe "" _amErrorMessage) $
                     AppSetErrorMessage Nothing
-            ]
+            ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
         , rightPanel
         ] `styleBasic` [padding 16]

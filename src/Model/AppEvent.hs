@@ -191,6 +191,7 @@ responseCalculatedHandle AIData{..} model =
         & nextPly .~ _adResponsePly
         & calculatingResponse .~ False
         & aiData . positionEvaluation .~ _adPositionEvaluation
+        & errorMessage .~ _adAiMessage
     , Event AppRunNextPly
     ]
 
