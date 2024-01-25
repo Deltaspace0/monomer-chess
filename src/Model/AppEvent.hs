@@ -190,7 +190,7 @@ responseCalculatedHandle newData@(AIData{..}) model =
     [ Model $ model
         & nextPly .~ _adResponsePly
         & calculatingResponse .~ False
-        & aiData .~ newData
+        & aiData . minimaxEvaluation .~ _adMinimaxEvaluation
     , Event AppRunNextPly
     ]
 
