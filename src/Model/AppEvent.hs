@@ -181,7 +181,7 @@ playNextResponseHandle model@(AppModel{..}) = response where
         , Task taskHandler
         ]
     taskHandler = do
-        let result = calculateMove _amChessPosition _amAiData
+        result <- calculateMove _amChessPosition _amAiData
         result `deepseq` pure ()
         return $ AppResponseCalculated result
 

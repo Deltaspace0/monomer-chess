@@ -36,7 +36,6 @@ module Model.AppModel
 import Control.Lens
 import Game.Chess
 import Data.Text (pack, Text)
-import System.Random
 import qualified Monomer as M
 
 import Model.AI
@@ -64,8 +63,8 @@ data AppModel = AppModel
 
 makeLensesWith abbreviatedFields 'AppModel
 
-initModel :: StdGen -> AppModel
-initModel g = AppModel
+initModel :: AppModel
+initModel = AppModel
     { _amBoardState = getBoardState False startpos
     , _amBoardStateReversed = getBoardState True startpos
     , _amChessPosition = startpos
@@ -82,7 +81,7 @@ initModel g = AppModel
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
     , _amFenData = getFenData startpos
-    , _amAiData = initAI g
+    , _amAiData = initAI
     }
 
 isWhiteTurn :: AppModel -> Bool

@@ -26,11 +26,10 @@ data Tree = Tree
 
 makeLensesWith abbreviatedFields 'Tree
 
-mctsMove :: Position -> StdGen -> Int -> (Maybe Ply, StdGen)
-mctsMove position randomGenerator runs = (ply, g) where
-    ply = snd <$> (getBestNode $ finalTree ^. childNodes)
-    (finalTree, g) = mctsRepeat tree randomGenerator runs
-    tree = initializeTree position
+mctsMove :: Position -> Int -> IO (Maybe Ply)
+mctsMove position runs = do
+    finalTree <- mctsRepeat runs $ initializeTree position
+    return $ snd <$> (getBestNode $ finalTree ^. childNodes)
 
 getBestNode :: [(Tree, Ply)] -> Maybe (Tree, Ply)
 getBestNode [] = Nothing
@@ -42,27 +41,21 @@ getBestNode (x:xs) = result where
     otherSimulations = (fst $ fromJust other) ^. statSimulations
     other = getBestNode xs
 
-mctsRepeat :: Tree -> StdGen -> Int -> (Tree, StdGen)
-mctsRepeat tree randomGenerator n = result where
-    result = if n <= 0
-        then (tree, randomGenerator)
-        else mctsRepeat nextTree g $ n-1
-    (nextTree, g) = monteCarloTreeSearch tree randomGenerator
+mctsRepeat :: Int -> Tree -> IO Tree
+mctsRepeat n tree = if n <= 0
+    then pure tree
+    else monteCarloTreeSearch tree >>= mctsRepeat (n-1)
 
-monteCarloTreeSearch :: Tree -> StdGen -> (Tree, StdGen)
-monteCarloTreeSearch tree@(Tree{..}) randomGenerator = r where
-    r = if _tStatSimulations == 0 || null _tChildNodes
-        then (rolloutTree, gr)
-        else (nextTree, g)
-    rolloutTree = tree
-        & statWins +~ rollout
-        & statSimulations +~ 1
-    (rollout, gr) = doRollout _tRootPosition randomGenerator
-    nextTree = tree
-        & statWins +~ 1-(subTree' ^. statWins)+(subTree ^. statWins)
-        & statSimulations +~ 1
-        & childNodes . element i . _1 .~ subTree'
-    (subTree', g) = monteCarloTreeSearch subTree randomGenerator
+monteCarloTreeSearch :: Tree -> IO Tree
+monteCarloTreeSearch tree@(Tree{..}) = result where
+    result = if _tStatSimulations == 0 || null _tChildNodes
+        then doRollout _tRootPosition <&> \x -> tree
+            & statWins +~ x
+            & statSimulations +~ 1
+        else monteCarloTreeSearch subTree <&> \x -> tree
+            & statWins +~ 1-(x ^. statWins)+(subTree ^. statWins)
+            & statSimulations +~ 1
+            & childNodes . element i . _1 .~ x
     (subTree, i) = selectChild tree
 
 selectChild :: Tree -> (Tree, Int)
@@ -78,19 +71,17 @@ selectChild Tree{..} = f $ zip subTrees [0..] where
     n = 2 * (log $ fromIntegral _tStatSimulations)
     subTrees = fst <$> _tChildNodes
 
-doRollout :: Position -> StdGen -> (Double, StdGen)
-doRollout position randomGenerator = result where
-    result
-        | null legal && inCheck White position = withRand 1
-        | null legal && inCheck Black position = withRand 1
-        | null legal || insufficientMaterial position = withRand 0.5
-        | halfMoveClock position >= 100 = withRand 0.5
-        | otherwise = (1-rollout, gr)
-    (rollout, gr) = doRollout nextPosition g
-    legal = legalPlies position
-    nextPosition = unsafeDoPly position $ legal!!i
-    (i, g) = randomR (0, length legal-1) randomGenerator
-    withRand x = (x, randomGenerator)
+doRollout :: Position -> IO Double
+doRollout position
+    | null legal && inCheck White position = pure 1
+    | null legal && inCheck Black position = pure 1
+    | null legal || insufficientMaterial position = pure 0.5
+    | halfMoveClock position >= 100 = pure 0.5
+    | otherwise = (1-) <$> rollout
+    where
+        legal = legalPlies position
+        rollout = i >>= doRollout . unsafeDoPly position . (legal!!)
+        i = randomRIO (0, length legal-1)
 
 initializeTree :: Position -> Tree
 initializeTree position = Tree
