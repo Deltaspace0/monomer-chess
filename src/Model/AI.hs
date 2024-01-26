@@ -129,17 +129,25 @@ uciMove position depth path recordLogs = result where
         mvar <- newEmptyMVar
         evar <- newEmptyMVar
         let readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
-        let readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
-        let logErrorOutput = readErrEOF $ \x -> do
+            readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
+            logErrorOutput = readErrEOF $ \x -> do
                 appendFile "logs_uci/errors.txt" $ x <> "\n"
                 logErrorOutput
-        let waitForUciOk = readNotEOF $ \x -> do
+            waitForUciOk = readNotEOF $ \x -> do
                 when recordLogs $
                     appendFile "logs_uci/outputs.txt" $ x <> "\n"
                 if x == "uciok"
                     then putMVar mvar x
                     else waitForUciOk
-        let waitForBestMove = hIsEOF hout >>= \eof -> if eof
+            waitForReadyOk = do
+                hPutStrLn hin "isready"
+                readNotEOF $ \x -> do
+                    when recordLogs $
+                        appendFile "logs_uci/outputs.txt" $ x <> "\n"
+                    if x == "readyok"
+                        then putMVar mvar x
+                        else threadDelay 500000 >> waitForReadyOk
+            waitForBestMove = hIsEOF hout >>= \eof -> if eof
                 then putMVar mvar "eof"
                 else do
                     x <- hGetLine hout
@@ -152,21 +160,30 @@ uciMove position depth path recordLogs = result where
                     if head ws == "bestmove"
                         then putMVar mvar $ ws!!1
                         else waitForBestMove
+            sendGoDepth = do
+                hPutStrLn hin $ "go depth " <> show depth
+                _ <- forkIO waitForBestMove
+                uciNotation <- takeMVar mvar
+                uciEval <- (extractUciEval position <$>) <$> tryTakeMVar evar
+                return $ if uciNotation == "eof"
+                    then msg "Unexpected EOF"
+                    else (fromUCI position uciNotation, uciEval, Nothing)
+            sendPositionFen = do
+                hPutStrLn hin $ "position fen " <> toFEN position
+                _ <- forkIO waitForReadyOk
+                response <- timeout 5000000 $ takeMVar mvar
+                if null response
+                    then return $ msg "isready timeout"
+                    else sendGoDepth
         when recordLogs $ do
             createDirectoryIfMissing True "logs_uci"
             _ <- forkIO logErrorOutput
             return ()
         _ <- forkIO waitForUciOk
         response <- timeout 2000000 $ takeMVar mvar
-        if null response then return $ msg "No support for UCI" else do
-            hPutStrLn hin $ "position fen " <> toFEN position
-            hPutStrLn hin $ "go depth " <> show depth
-            _ <- forkIO waitForBestMove
-            uciNotation <- takeMVar mvar
-            uciEval <- (extractUciEval position <$>) <$> tryTakeMVar evar
-            return $ if uciNotation == "eof"
-                then msg "Unexpected EOF"
-                else (fromUCI position uciNotation, uciEval, Nothing)
+        if null response
+            then return $ msg "No support for UCI"
+            else sendPositionFen
     uciProcess = try' $ createProcess (proc (unpack path) [])
         { std_out = CreatePipe
         , std_in = CreatePipe
