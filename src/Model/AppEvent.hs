@@ -231,6 +231,10 @@ clearEditBoardHandle model =
     [ Model $ model
         & fenData . fenBoardState .~ take 64 (repeat [])
         & fenData . fenBoardStateReversed .~ take 64 (repeat [])
+        & fenData . fenCastleWK .~ False
+        & fenData . fenCastleWQ .~ False
+        & fenData . fenCastleBK .~ False
+        & fenData . fenCastleBQ .~ False
     , Event AppUpdateFEN
     ]
 
