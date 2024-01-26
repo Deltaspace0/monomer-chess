@@ -13,6 +13,7 @@ module Model.AI
     , positionEvaluation
     , uciEnginePath
     , uciEngineDepth
+    , uciLogs
     , aiMessage
     , initAI
     , calculateMove
@@ -30,6 +31,7 @@ import Game.Chess
 import GHC.Generics
 import Numeric
 import System.IO
+import System.Directory
 import System.Process
 import System.Random
 import System.Timeout
@@ -60,6 +62,7 @@ data AIData = AIData
     , _adAiMessage :: Maybe Text
     , _adUciEnginePath :: Text
     , _adUciEngineDepth :: Int
+    , _adUciLogs :: Bool
     } deriving (Eq, Show, Generic)
 
 instance NFData Ply where
@@ -80,6 +83,7 @@ initAI = AIData
     , _adAiMessage = Nothing
     , _adUciEnginePath = ""
     , _adUciEngineDepth = 20
+    , _adUciLogs = False
     }
 
 calculateMove :: Position -> AIData -> IO AIData
@@ -97,7 +101,7 @@ calculateMove pos aiData@(AIData{..}) = result where
             & responsePly .~ uciPly
             & aiMessage .~ msg
     (mmPly, eval) = minimaxMove pos _adMinimaxDepth
-    uciResponse = uciMove pos _adUciEngineDepth _adUciEnginePath
+    uciResponse = uciMove pos _adUciEngineDepth _adUciEnginePath _adUciLogs
     cleanData = aiData
         & positionEvaluation .~ Nothing
         & aiMessage .~ Nothing
@@ -109,30 +113,49 @@ randomMove position = result where
         else Just . (legal!!) <$> randomRIO (0, length legal-1)
     legal = legalPlies position
 
-uciMove :: Position -> Int -> Text -> IO (Maybe Ply, Maybe Text, Maybe Text)
-uciMove position depth path = result where
+uciMove
+    :: Position
+    -> Int
+    -> Text
+    -> Bool
+    -> IO (Maybe Ply, Maybe Text, Maybe Text)
+uciMove position depth path recordLogs = result where
     result = uciProcess >>= \processResult -> case processResult of
         Left _ -> return $ msg "Can't run the engine"
-        Right (Just hin, Just hout, _, _) -> uciTalk hin hout
-    uciTalk hin hout = do
+        Right (Just hin, Just hout, Just herr, _) -> uciTalk hin hout herr
+    uciTalk hin hout herr = do
         hSetBuffering hin NoBuffering
         hPutStrLn hin "uci"
         mvar <- newEmptyMVar
         evar <- newEmptyMVar
         let readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
-        let waitForUciOk = readNotEOF $ \x -> if x == "uciok"
-                then putMVar mvar x
-                else waitForUciOk
+        let readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
+        let logErrorOutput = readErrEOF $ \x -> do
+                appendFile "logs_uci/errors.txt" $ x <> "\n"
+                logErrorOutput
+        let waitForUciOk = readNotEOF $ \x -> do
+                when recordLogs $
+                    appendFile "logs_uci/outputs.txt" $ x <> "\n"
+                if x == "uciok"
+                    then putMVar mvar x
+                    else waitForUciOk
         let waitForBestMove = hIsEOF hout >>= \eof -> if eof
                 then putMVar mvar "eof"
                 else do
-                    ws <- words <$> hGetLine hout
+                    x <- hGetLine hout
+                    when recordLogs $
+                        appendFile "logs_uci/outputs.txt" $ x <> "\n"
+                    let ws = words x
                     when ("score" `elem` ws) $ do
                         _ <- tryTakeMVar evar
                         putMVar evar ws
                     if head ws == "bestmove"
                         then putMVar mvar $ ws!!1
                         else waitForBestMove
+        when recordLogs $ do
+            createDirectoryIfMissing True "logs_uci"
+            _ <- forkIO logErrorOutput
+            return ()
         _ <- forkIO waitForUciOk
         response <- timeout 2000000 $ takeMVar mvar
         if null response then return $ msg "No support for UCI" else do

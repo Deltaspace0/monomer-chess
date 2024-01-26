@@ -49,6 +49,7 @@ library
       base >=4.7 && <5
     , chessIO
     , deepseq
+    , directory
     , lens
     , monomer
     , monomer-widgets
@@ -72,6 +73,7 @@ executable monomer-chess-exe
       base >=4.7 && <5
     , chessIO
     , deepseq
+    , directory
     , lens
     , monomer
     , monomer-chess
@@ -97,6 +99,7 @@ test-suite monomer-chess-test
       base >=4.7 && <5
     , chessIO
     , deepseq
+    , directory
     , lens
     , monomer
     , monomer-chess

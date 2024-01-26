@@ -37,6 +37,8 @@ buildUI _ AIData{..} = tree where
                 , textField uciEnginePath
                 ]
         , widgetIf (_adResponseMethod == UCIResponse) $
+            labeledCheckbox "Record UCI logs" uciLogs
+        , widgetIf (_adResponseMethod == UCIResponse) $
             hgrid_ [childSpacing_ 16]
                 [ label $ "Engine depth: " <> (showt _adUciEngineDepth)
                 , hslider_ uciEngineDepth 1 100 [dragRate 1]
