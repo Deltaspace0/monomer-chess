@@ -123,7 +123,7 @@ uciMove position depth path = result where
                 then putMVar mvar x
                 else waitForUciOk
         let waitForBestMove = hIsEOF hout >>= \eof -> if eof
-                then putMVar mvar ""
+                then putMVar mvar "eof"
                 else hGetLine hout >>= \x -> do
                     let ws = words x
                     when ("score" `elem` ws) $ do
@@ -140,7 +140,9 @@ uciMove position depth path = result where
             _ <- forkIO waitForBestMove
             uciNotation <- takeMVar mvar
             uciEval <- (extractUciEval position <$>) <$> tryTakeMVar evar
-            return (fromUCI position uciNotation, uciEval, Nothing)
+            return $ if uciNotation == "eof"
+                then msg "Unexpected EOF"
+                else (fromUCI position uciNotation, uciEval, Nothing)
     uciProcess = try' $ createProcess (proc (unpack path) [])
         { std_out = CreatePipe
         , std_in = CreatePipe
