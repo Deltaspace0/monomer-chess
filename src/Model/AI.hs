@@ -124,11 +124,13 @@ uciMove position depth path = result where
         if null response then return $ msg "No support for UCI" else do
             hPutStrLn hin $ "position fen " <> toFEN position
             hPutStrLn hin $ "go depth " <> show depth
-            let waitForBestMove = readNotEOF $ \x -> do
-                    let ws = words x
-                    if head ws == "bestmove"
-                        then putMVar mvar $ ws!!1
-                        else waitForBestMove
+            let waitForBestMove = hIsEOF hout >>= \eof -> if eof
+                    then putMVar mvar ""
+                    else hGetLine hout >>= \x -> do
+                        let ws = words x
+                        if head ws == "bestmove"
+                            then putMVar mvar $ ws!!1
+                            else waitForBestMove
             _ <- forkIO waitForBestMove
             uciNotation <- takeMVar mvar
             return (fromUCI position uciNotation, Nothing, Nothing)
