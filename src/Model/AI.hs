@@ -28,6 +28,7 @@ import Data.Maybe
 import Data.Text (Text, pack, unpack)
 import Game.Chess
 import GHC.Generics
+import Numeric
 import System.IO
 import System.Process
 import System.Random
@@ -124,8 +125,8 @@ uciMove position depth path = result where
                 else waitForUciOk
         let waitForBestMove = hIsEOF hout >>= \eof -> if eof
                 then putMVar mvar "eof"
-                else hGetLine hout >>= \x -> do
-                    let ws = words x
+                else do
+                    ws <- words <$> hGetLine hout
                     when ("score" `elem` ws) $ do
                         _ <- tryTakeMVar evar
                         putMVar evar ws
@@ -154,13 +155,14 @@ uciMove position depth path = result where
 extractUciEval :: Position -> [String] -> Text
 extractUciEval position ws
     | s > length ws-3 = "error - invalid UCI"
-    | evalType == "cp" = c <> " has advantage of " <> cpNumber
+    | evalType == "cp" = c <> " has advantage of " <> cpNumberText
     | evalType == "mate" = c <> " mates in " <> mateNumberText <> " moves"
     | otherwise = "error - unknown score type"
     where
         mateNumberText = showt $ abs mateNumber
         mateNumber = read evalNumber :: Int
-        cpNumber = showt $ abs $ (read evalNumber :: Double)/100
+        cpNumberText = pack $ showFFloat Nothing (abs cpNumber) ""
+        cpNumber = (read evalNumber :: Double)/100
         evalType = ws!!(s+1)
         evalNumber = ws!!(s+2)
         s = fromJust $ elemIndex "score" ws
