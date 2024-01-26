@@ -23,7 +23,9 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Lens
 import Control.Monad
-import Data.Text (Text, unpack)
+import Data.List
+import Data.Maybe
+import Data.Text (Text, pack, unpack)
 import Game.Chess
 import GHC.Generics
 import System.IO
@@ -115,25 +117,30 @@ uciMove position depth path = result where
         hSetBuffering hin NoBuffering
         hPutStrLn hin "uci"
         mvar <- newEmptyMVar
+        evar <- newEmptyMVar
         let readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
         let waitForUciOk = readNotEOF $ \x -> if x == "uciok"
                 then putMVar mvar x
                 else waitForUciOk
+        let waitForBestMove = hIsEOF hout >>= \eof -> if eof
+                then putMVar mvar ""
+                else hGetLine hout >>= \x -> do
+                    let ws = words x
+                    when ("score" `elem` ws) $ do
+                        _ <- tryTakeMVar evar
+                        putMVar evar ws
+                    if head ws == "bestmove"
+                        then putMVar mvar $ ws!!1
+                        else waitForBestMove
         _ <- forkIO waitForUciOk
         response <- timeout 2000000 $ takeMVar mvar
         if null response then return $ msg "No support for UCI" else do
             hPutStrLn hin $ "position fen " <> toFEN position
             hPutStrLn hin $ "go depth " <> show depth
-            let waitForBestMove = hIsEOF hout >>= \eof -> if eof
-                    then putMVar mvar ""
-                    else hGetLine hout >>= \x -> do
-                        let ws = words x
-                        if head ws == "bestmove"
-                            then putMVar mvar $ ws!!1
-                            else waitForBestMove
             _ <- forkIO waitForBestMove
             uciNotation <- takeMVar mvar
-            return (fromUCI position uciNotation, Nothing, Nothing)
+            uciEval <- (extractUciEval position <$>) <$> tryTakeMVar evar
+            return (fromUCI position uciNotation, uciEval, Nothing)
     uciProcess = try' $ createProcess (proc (unpack path) [])
         { std_out = CreatePipe
         , std_in = CreatePipe
@@ -141,3 +148,20 @@ uciMove position depth path = result where
         }
     try' = try :: IO a -> IO (Either IOException a)
     msg x = (Nothing, Nothing, Just x)
+
+extractUciEval :: Position -> [String] -> Text
+extractUciEval position ws
+    | s > length ws-3 = "error - invalid UCI"
+    | evalType == "cp" = c <> " has advantage of " <> cpNumber
+    | evalType == "mate" = c <> " mates in " <> mateNumberText <> " moves"
+    | otherwise = "error - unknown score type"
+    where
+        mateNumberText = showt $ abs mateNumber
+        mateNumber = read evalNumber :: Int
+        cpNumber = showt $ abs $ (read evalNumber :: Double)/100
+        evalType = ws!!(s+1)
+        evalNumber = ws!!(s+2)
+        s = fromJust $ elemIndex "score" ws
+        c = pack $ show $ if mateNumber > 0
+            then color position
+            else opponent $ color position
