@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module UI
@@ -37,8 +38,36 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
+        , moveHistoryPanel
+        , separatorLine
         , rightPanel
         ] `styleBasic` [padding 16]
+    moveHistoryPanel = vscroll_ [wheelRate 32]
+        (vstack_ [childSpacing_ 4] (makeHistoryLine <$> moveIndices))
+            `styleBasic` [sizeReqW $ fixedSize 204]
+    moveIndices = if firstMoveColor == White
+        then [0..(length _amPreviousPositions) `div` 2 - 1]
+        else [0..(length _amPreviousPositions + 1) `div` 2 - 1]
+    makeHistoryLine i = hstack
+        [ labelS (i+1) `styleBasic` [sizeReqW $ fixedSize 30]
+        , hgrid_ [childSpacing_ 4]
+            [ if i1 < 1
+                then filler
+                else optionButton_ t1 i1 currentPlyNumber
+                    [onChange AppPlyNumberChanged]
+            , if l-i2 < 0
+                then filler
+                else optionButton_ t2 i2 currentPlyNumber
+                    [onChange AppPlyNumberChanged]
+            ] `styleBasic` [sizeReqW $ fixedSize 164]
+        ] where
+            (_, _, t1) = _amPreviousPositions!!(l-i1)
+            (_, _, t2) = _amPreviousPositions!!(l-i2)
+            l = length _amPreviousPositions-1
+            (i1, i2) = if firstMoveColor == White
+                then (i*2+1, i*2+2)
+                else (i*2, i*2+1)
+    firstMoveColor = let (p, _, _) = last _amPreviousPositions in color p
     rightPanel = vstack' $ if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`
@@ -99,7 +128,7 @@ buildUI _ model@(AppModel{..}) = tree where
                     else button "Play next response" AppPlayNextResponse
                         `nodeEnabled` (not noLegalMoves)
                 , button "Undo move" AppUndoMove `nodeEnabled` all not
-                    [ null _amPreviousPositions
+                    [ length _amPreviousPositions < 2
                     , _amCalculatingResponse
                     ]
                 ]

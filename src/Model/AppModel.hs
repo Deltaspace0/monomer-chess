@@ -12,6 +12,7 @@ module Model.AppModel
     , nextPly
     , chessPosition
     , previousPositions
+    , currentPlyNumber
     , showTwoBoards
     , showEditMenu
     , showPromotionMenu
@@ -45,7 +46,8 @@ data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPreviousPositions :: [(Position, Text)]
+    , _amPreviousPositions :: [(Position, Text, Text)]
+    , _amCurrentPlyNumber :: Int
     , _amNextPly :: Maybe Ply
     , _amShowTwoBoards :: Bool
     , _amShowEditMenu :: Bool
@@ -68,7 +70,8 @@ initModel = AppModel
     { _amBoardState = getBoardState False startpos
     , _amBoardStateReversed = getBoardState True startpos
     , _amChessPosition = startpos
-    , _amPreviousPositions = []
+    , _amPreviousPositions = [(startpos, "", "")]
+    , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
     , _amShowTwoBoards = False
     , _amShowEditMenu = False

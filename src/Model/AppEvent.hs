@@ -30,6 +30,7 @@ data AppEvent
     | AppPromote PieceType
     | AppPlayNextResponse
     | AppResponseCalculated AIData
+    | AppPlyNumberChanged Int
     | AppUndoMove
     | AppLoadFEN
     | AppApplyEditChanges
@@ -53,6 +54,7 @@ handleEvent _ _ model event = case event of
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
     AppResponseCalculated v -> responseCalculatedHandle v model
+    AppPlyNumberChanged v -> plyNumberChangedHandle v model
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
     AppApplyEditChanges -> applyEditChangesHandle model
@@ -63,7 +65,8 @@ setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & previousPositions .~ []
+        & previousPositions .~ [(position, "", "")]
+        & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
@@ -148,20 +151,23 @@ runNextPlyHandle model@(AppModel{..}) = response where
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions %~ ((_amChessPosition, moves):)
+                & previousPositions .~ newPreviousPositions
+                & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
-    newFEN = pack $ toFEN $ fromJust newPosition
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
-    newSanMoves = moves <> numberText <> " " <> san
-    moves = _amSanMoves
+    newPreviousPositions = pp:(drop i _amPreviousPositions)
+    pp = (fromJust newPosition, newSanMoves, san)
+    i = length _amPreviousPositions - _amCurrentPlyNumber - 1
+    newSanMoves = _amSanMoves <> numberText <> " " <> san
+    newFEN = pack $ toFEN $ fromJust newPosition
     numberText = if color _amChessPosition == White
-        then (if moves == "" then "" else " ") <> number <> "."
-        else ""
+        then (if _amSanMoves == "" then "" else " ") <> number <> "."
+        else (if _amSanMoves == "" then "1..." else "")
     number = showt $ moveNumber _amChessPosition
     san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
 
@@ -195,6 +201,20 @@ responseCalculatedHandle AIData{..} model =
     , Event AppRunNextPly
     ]
 
+plyNumberChangedHandle :: Int -> EventHandle
+plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & chessPosition .~ previousPosition
+            & showPromotionMenu .~ False
+            & sanMoves .~ moves
+            & forsythEdwards .~ pack (toFEN previousPosition)
+            & aiData . positionEvaluation .~ Nothing
+        , Event AppSyncBoard
+        ]
+    (previousPosition, moves, _) = _amPreviousPositions!!i
+    i = length _amPreviousPositions - newPlyNumber - 1
+
 undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
     response = if null _amPreviousPositions
@@ -203,13 +223,14 @@ undoMoveHandle model@(AppModel{..}) = response where
             [ Model $ model
                 & chessPosition .~ previousPosition
                 & previousPositions .~ tail _amPreviousPositions
+                & currentPlyNumber .~ length _amPreviousPositions-2
                 & showPromotionMenu .~ False
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
                 & aiData . positionEvaluation .~ Nothing
             , Event AppSyncBoard
             ]
-    (previousPosition, moves) = head _amPreviousPositions
+    (previousPosition, moves, _) = _amPreviousPositions!!1
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where

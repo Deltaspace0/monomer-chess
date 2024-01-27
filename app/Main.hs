@@ -8,7 +8,7 @@ import UI
 main :: IO ()
 main = do
     let config =
-            [ appWindowState $ MainWindowNormal (864, 640)
+            [ appWindowState $ MainWindowNormal (1100, 640)
             , appWindowResizable False
             , appWindowTitle "Monomer chess"
             , appTheme darkTheme
