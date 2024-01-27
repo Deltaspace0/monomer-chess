@@ -16,7 +16,7 @@ import Model
 
 buildUI :: UIBuilder AppModel AppEvent
 buildUI _ model@(AppModel{..}) = tree where
-    tree = hstack'
+    tree = keystroke keyShortcuts $ hstack'
         [ zstack
             [ vstack'
                 [ box' $ chessBoardLeft `styleBasic`
@@ -209,3 +209,9 @@ buildUI _ model@(AppModel{..}) = tree where
         else button "Edit position" $ AppSetEditMenu True)
             `nodeEnabled` not _amCalculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
+    keyShortcuts =
+        [ ("Left", AppPlyNumberChanged $ _amCurrentPlyNumber-1)
+        , ("Right", AppPlyNumberChanged $ _amCurrentPlyNumber+1)
+        , ("Up", AppPlyNumberChanged 0)
+        , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
+        ]

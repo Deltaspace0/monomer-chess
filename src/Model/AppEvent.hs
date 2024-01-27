@@ -203,17 +203,20 @@ responseCalculatedHandle AIData{..} model =
 
 plyNumberChangedHandle :: Int -> EventHandle
 plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
-    response =
-        [ Model $ model
-            & chessPosition .~ previousPosition
-            & showPromotionMenu .~ False
-            & sanMoves .~ moves
-            & forsythEdwards .~ pack (toFEN previousPosition)
-            & aiData . positionEvaluation .~ Nothing
-        , Event AppSyncBoard
-        ]
-    (previousPosition, moves, _) = _amPreviousPositions!!i
-    i = length _amPreviousPositions - newPlyNumber - 1
+    response = if newPlyNumber < 0 || newPlyNumber > l-1
+        then []
+        else
+            [ Model $ model
+                & chessPosition .~ previousPosition
+                & currentPlyNumber .~ newPlyNumber
+                & showPromotionMenu .~ False
+                & sanMoves .~ moves
+                & forsythEdwards .~ pack (toFEN previousPosition)
+                & aiData . positionEvaluation .~ Nothing
+            , Event AppSyncBoard
+            ]
+    (previousPosition, moves, _) = _amPreviousPositions!!(l-newPlyNumber-1)
+    l = length _amPreviousPositions
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
