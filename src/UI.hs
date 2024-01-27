@@ -77,22 +77,22 @@ buildUI _ model@(AppModel{..}) = tree where
     gameControlPanel = vstack'
         [ buttonPanel
         , separatorLine
-        , labeledCheckbox "Auto promote to queen" autoQueen
-        , labeledCheckbox "Auto respond" autoRespond
+        , labeledCheckbox_ "Rotate board" boardRotated [textRight]
+        , labeledCheckbox_ "Auto promote to queen" autoQueen [textRight]
+        , labeledCheckbox_ "Auto respond" autoRespond [textRight]
         , separatorLine
         , aiPanel aiData
         ]
     buttonPanel = vstack' $ if _amShowEditMenu
         then
-            [ resetRotateButtons
+            [ resetTwoBoardsButtons
             , hgrid'
                 [ button "Apply changes" AppApplyEditChanges
                 , button "Clear board" AppClearEditBoard
                 ]
-            , toggleButton "Show two boards" showTwoBoards
             ]
         else
-            [ resetRotateButtons
+            [ resetTwoBoardsButtons
             , hgrid'
                 [ if _amCalculatingResponse
                     then thinkButton
@@ -103,12 +103,11 @@ buildUI _ model@(AppModel{..}) = tree where
                     , _amCalculatingResponse
                     ]
                 ]
-            , toggleButton "Show two boards" showTwoBoards
             ]
-    resetRotateButtons = hgrid'
+    resetTwoBoardsButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
             `nodeEnabled` not _amCalculatingResponse
-        , toggleButton "Rotate board" boardRotated
+        , toggleButton "Two boards" showTwoBoards
         ]
     promotionMenu = vstack'
         [ label "Promote to:"

@@ -22,7 +22,7 @@ aiPanel field = node where
 buildUI :: UIBuilder AIData ()
 buildUI _ AIData{..} = tree where
     tree = vstack_ [childSpacing_ 16]
-        [ hgrid_ [childSpacing_ 16]
+        [ hstack_ [childSpacing_ 16]
             [ label "How to calculate:"
             , textDropdownS responseMethod
                 [ RandomResponse
@@ -32,7 +32,7 @@ buildUI _ AIData{..} = tree where
                 ]
             ]
         , widgetIf (_adResponseMethod == UCIResponse) $
-            hgrid_ [childSpacing_ 16]
+            hstack_ [childSpacing_ 16]
                 [ label "Path: "
                 , textField uciEnginePath
                 ]

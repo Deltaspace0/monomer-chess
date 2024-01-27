@@ -46,8 +46,14 @@ buildUI _ _ = tree where
             ]
         ]
     vstack' = vstack_ [childSpacing_ 16]
-    labeledRadio' t v l = labeledRadio_ t v l [onChange updateR]
-    labeledCheckbox' t l = labeledCheckbox_ t l [onChange updateC]
+    labeledRadio' t v l = labeledRadio_ t v l
+        [ onChange updateR
+        , textRight
+        ]
+    labeledCheckbox' t l = labeledCheckbox_ t l
+        [ onChange updateC
+        , textRight
+        ]
     updateR :: Color -> FlagEvent
     updateR = const EventUpdateFEN
     updateC :: Bool -> FlagEvent
