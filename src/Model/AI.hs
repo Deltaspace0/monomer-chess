@@ -124,7 +124,7 @@ uciMove position depth path recordLogs = result where
         Left _ -> return $ msg "Can't run the engine"
         Right (Just hin, Just hout, Just herr, _) -> uciTalk hin hout herr
     uciTalk hin hout herr = do
-        hSetBuffering hin NoBuffering
+        hSetBuffering hin LineBuffering
         hPutStrLn hin "uci"
         mvar <- newEmptyMVar
         evar <- newEmptyMVar
