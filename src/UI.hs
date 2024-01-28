@@ -38,10 +38,32 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
-        , moveHistoryPanel
+        , vstack'
+            [ moveHistoryButtons
+            , separatorLine
+            , moveHistoryPanel
+            ]
         , separatorLine
         , rightPanel
         ] `styleBasic` [padding 16]
+    keyShortcuts =
+        [ ("Left", AppPlyNumberChanged $ _amCurrentPlyNumber-1)
+        , ("Right", AppPlyNumberChanged $ _amCurrentPlyNumber+1)
+        , ("Up", AppPlyNumberChanged 0)
+        , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
+        ]
+    moveHistoryButtons = hgrid'
+        [ button "<<" (AppPlyNumberChanged 0)
+            `nodeEnabled` notFirstPosition
+        , button "<" (AppPlyNumberChanged $ _amCurrentPlyNumber-1)
+            `nodeEnabled` notFirstPosition
+        , button ">" (AppPlyNumberChanged $ _amCurrentPlyNumber+1)
+            `nodeEnabled` notLastPosition
+        , button ">>" (AppPlyNumberChanged $ length _amPreviousPositions-1)
+            `nodeEnabled` notLastPosition
+        ]
+    notFirstPosition = _amCurrentPlyNumber > 0
+    notLastPosition = _amCurrentPlyNumber < length _amPreviousPositions-1
     moveHistoryPanel = vscroll_ [wheelRate 32]
         (vstack_ [childSpacing_ 4] (makeHistoryLine <$> moveIndices))
             `styleBasic` [sizeReqW $ fixedSize 204]
@@ -209,9 +231,3 @@ buildUI _ model@(AppModel{..}) = tree where
         else button "Edit position" $ AppSetEditMenu True)
             `nodeEnabled` not _amCalculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
-    keyShortcuts =
-        [ ("Left", AppPlyNumberChanged $ _amCurrentPlyNumber-1)
-        , ("Right", AppPlyNumberChanged $ _amCurrentPlyNumber+1)
-        , ("Up", AppPlyNumberChanged 0)
-        , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
-        ]
