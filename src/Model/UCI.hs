@@ -140,11 +140,13 @@ getUciDepth uciOutput depth = newDepth where
 
 getNewPrincipalVariations :: Position -> String -> [Text] -> [Text]
 getNewPrincipalVariations position uciOutput variations = newVariations where
-    newVariations = if "multipv" `elem` ws
+    newVariations = if "pv" `elem` ws
         then (variations <> emptyLines) & ix (j-1) .~ uciInfo
         else variations
     emptyLines = take (j-length variations) $ repeat "..."
-    j = read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
+    j = if "multipv" `elem` ws
+        then read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
+        else 1
     uciInfo = if and conditions
         then evaluationText <> " " <> movesText
         else "error - invalid UCI"
