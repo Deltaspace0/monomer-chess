@@ -29,7 +29,10 @@ buildUI _ model@(AppModel{..}) = tree where
                     then box_ [alignRight] editButton
                     else zstack
                         [ label gameTurnText
-                        , box_ [alignRight] editButton
+                        , box_ [alignRight] $ hstack'
+                            [ label currentDepthText
+                            , editButton
+                            ]
                         ]
                 , separatorLine
                 , vscroll_ [wheelRate 32] $ vstack' $
@@ -236,6 +239,9 @@ buildUI _ model@(AppModel{..}) = tree where
         else if color _amChessPosition == White
             then "White's turn"
             else "Black's turn"
+    currentDepthText = if null _uciCurrentEngineDepth
+        then "No analysis available"
+        else "Current depth: " <> fromJust _uciCurrentEngineDepth
     editButton = (if _amShowEditMenu
         then button "Go back" $ AppSetEditMenu False
         else button "Edit position" $ AppSetEditMenu True)

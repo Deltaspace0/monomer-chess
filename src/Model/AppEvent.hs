@@ -40,6 +40,7 @@ data AppEvent
     | AppLoadEngine
     | AppUciOutputReceived String
     | AppSetRequestMVar (Maybe (MVar String))
+    | AppSetCurrentEngineDepth (Maybe Text)
     | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
     deriving (Eq, Show)
@@ -69,6 +70,7 @@ handleEvent _ _ model event = case event of
     AppLoadEngine -> loadEngineHandle model
     AppUciOutputReceived v -> uciOutputReceivedHandle v model
     AppSetRequestMVar v -> setRequestMVarHandle v model
+    AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
     AppRunAnalysis -> runAnalysisHandle model
 
@@ -291,15 +293,24 @@ loadEngineHandle AppModel{..} = [Producer producerHandler] where
         EventOutputReceived v -> AppUciOutputReceived v
         EventReportError v -> AppSetErrorMessage $ Just v
         EventSetRequestMVar v -> AppSetRequestMVar v
+        EventSetCurrentDepth v -> AppSetCurrentEngineDepth v
         EventSetPV v -> AppSetPrincipalVariations v
 
 uciOutputReceivedHandle :: String -> EventHandle
 uciOutputReceivedHandle uciOutput model@(AppModel{..}) = response where
-    response = [Model $ model & uciData . principalVariations %~ f]
+    response =
+        [ Model $ model
+            & uciData . currentEngineDepth %~ getUciDepth uciOutput
+            & uciData . principalVariations %~ f
+        ]
     f = getNewPrincipalVariations _amChessPosition uciOutput
 
 setRequestMVarHandle :: Maybe (MVar String) -> EventHandle
 setRequestMVarHandle v model = [Model $ model & uciData . requestMVar .~ v]
+
+setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
+setCurrentEngineDepthHandle v model = response where
+    response = [Model $ model & uciData . currentEngineDepth .~ v]
 
 setPrincipalVariationsHandle :: [Text] -> EventHandle
 setPrincipalVariationsHandle v model = response where

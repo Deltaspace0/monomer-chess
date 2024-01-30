@@ -10,10 +10,12 @@ module Model.UCI
     , engineDepth
     , engineLines
     , makeLogs
+    , currentEngineDepth
     , principalVariations
     , requestMVar
     , defaultUciData
     , loadUciEngine
+    , getUciDepth
     , getNewPrincipalVariations
     , uciRequestAnalysis
     ) where
@@ -38,6 +40,7 @@ data UCIEvent
     = EventOutputReceived String
     | EventReportError Text
     | EventSetRequestMVar (Maybe (MVar String))
+    | EventSetCurrentDepth (Maybe Text)
     | EventSetPV [Text]
     deriving (Eq, Show)
 
@@ -46,6 +49,7 @@ data UCIData = UCIData
     , _uciEngineDepth :: Int
     , _uciEngineLines :: Int
     , _uciMakeLogs :: Bool
+    , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVar :: Maybe (MVar String)
     } deriving (Eq, Show)
@@ -61,6 +65,7 @@ defaultUciData = UCIData
     , _uciEngineDepth = 20
     , _uciEngineLines = 1
     , _uciMakeLogs = False
+    , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVar = Nothing
     }
@@ -105,7 +110,8 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     raiseEvent $ EventOutputReceived x
                     uciOutputLoop
             uciRequestLoop = takeMVar rvar >>= \x -> unless (x == "eof") $ do
-                when ("position" `elem` (words x)) $
+                when ("position" `elem` (words x)) $ do
+                    raiseEvent $ EventSetCurrentDepth Nothing
                     raiseEvent $ EventSetPV []
                 hPutStrLn hin x
                 uciRequestLoop
@@ -124,6 +130,13 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 _ <- forkIO uciOutputLoop
                 raiseEvent $ EventSetRequestMVar $ Just rvar
                 uciRequestLoop
+
+getUciDepth :: String -> Maybe Text -> Maybe Text
+getUciDepth uciOutput depth = newDepth where
+    newDepth = if "depth" `elem` ws
+        then Just $ pack $ ws!!(fromJust (elemIndex "depth" ws) + 1)
+        else depth
+    ws = words uciOutput
 
 getNewPrincipalVariations :: Position -> String -> [Text] -> [Text]
 getNewPrincipalVariations position uciOutput variations = newVariations where
