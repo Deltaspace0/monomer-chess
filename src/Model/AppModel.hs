@@ -6,6 +6,7 @@
 module Model.AppModel
     ( module Model.AI
     , module Model.FENData
+    , module Model.UCI
     , AppModel(..)
     , boardState
     , boardStateReversed
@@ -25,6 +26,7 @@ module Model.AppModel
     , forsythEdwards
     , fenData
     , aiData
+    , uciData
     , initModel
     , isWhiteTurn
     , getPathOrColor
@@ -41,12 +43,13 @@ import qualified Monomer as M
 
 import Model.AI
 import Model.FENData
+import Model.UCI
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPreviousPositions :: [(Position, Text, Text)]
+    , _amPreviousPositions :: [(Position, Text, String, Text)]
     , _amCurrentPlyNumber :: Int
     , _amNextPly :: Maybe Ply
     , _amShowTwoBoards :: Bool
@@ -61,6 +64,7 @@ data AppModel = AppModel
     , _amForsythEdwards :: Text
     , _amFenData :: FENData
     , _amAiData :: AIData
+    , _amUciData :: UCIData
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -70,7 +74,7 @@ initModel = AppModel
     { _amBoardState = getBoardState False startpos
     , _amBoardStateReversed = getBoardState True startpos
     , _amChessPosition = startpos
-    , _amPreviousPositions = [(startpos, "", "")]
+    , _amPreviousPositions = [(startpos, "", "", "")]
     , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
     , _amShowTwoBoards = False
@@ -85,6 +89,7 @@ initModel = AppModel
     , _amForsythEdwards = pack $ toFEN startpos
     , _amFenData = getFenData startpos
     , _amAiData = initAI
+    , _amUciData = defaultUciData
     }
 
 isWhiteTurn :: AppModel -> Bool

@@ -31,18 +31,6 @@ buildUI _ AIData{..} = tree where
                 , MCTSResponse
                 ]
             ]
-        , widgetIf (_adResponseMethod == UCIResponse) $
-            hstack_ [childSpacing_ 16]
-                [ label "Path: "
-                , textField uciEnginePath
-                ]
-        , widgetIf (_adResponseMethod == UCIResponse) $
-            labeledCheckbox "Record UCI logs" uciLogs
-        , widgetIf (_adResponseMethod == UCIResponse) $
-            hgrid_ [childSpacing_ 16]
-                [ label $ "Engine depth: " <> (showt _adUciEngineDepth)
-                , hslider_ uciEngineDepth 1 100 [dragRate 1]
-                ]
         , widgetIf (_adResponseMethod == MinimaxResponse) $
             hgrid_ [childSpacing_ 16]
                 [ label $ "Minimax depth: " <> (showt _adMinimaxDepth)

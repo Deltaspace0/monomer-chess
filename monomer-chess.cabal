@@ -37,6 +37,7 @@ library
       Model.AppEvent
       Model.AppModel
       Model.FENData
+      Model.UCI
       UI
   other-modules:
       Paths_monomer_chess

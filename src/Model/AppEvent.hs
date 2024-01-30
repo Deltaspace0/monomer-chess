@@ -5,6 +5,7 @@ module Model.AppEvent
     , handleEvent
     ) where
 
+import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens
@@ -36,6 +37,11 @@ data AppEvent
     | AppApplyEditChanges
     | AppClearEditBoard
     | AppUpdateFEN
+    | AppLoadEngine
+    | AppUciOutputReceived String
+    | AppSetRequestMVar (Maybe (MVar String))
+    | AppSetPrincipalVariations [String]
+    | AppRunAnalysis
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -60,18 +66,24 @@ handleEvent _ _ model event = case event of
     AppApplyEditChanges -> applyEditChangesHandle model
     AppClearEditBoard -> clearEditBoardHandle model
     AppUpdateFEN -> updateFenHandle model
+    AppLoadEngine -> loadEngineHandle model
+    AppUciOutputReceived v -> uciOutputReceivedHandle v model
+    AppSetRequestMVar v -> setRequestMVarHandle v model
+    AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
+    AppRunAnalysis -> runAnalysisHandle model
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & previousPositions .~ [(position, "", "")]
+        & previousPositions .~ [(position, "", "", "")]
         & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
         & aiData . positionEvaluation .~ Nothing
     , Event AppSyncBoard
+    , Event AppRunAnalysis
     ]
 
 syncBoardHandle :: EventHandle
@@ -151,18 +163,17 @@ runNextPlyHandle model@(AppModel{..}) = response where
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions .~ newPreviousPositions
+                & previousPositions .~ pp:cutOffPreviousPositions
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
+            , Event AppRunAnalysis
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
-    newPreviousPositions = pp:(drop i _amPreviousPositions)
-    pp = (fromJust newPosition, newSanMoves, san)
-    i = length _amPreviousPositions - _amCurrentPlyNumber - 1
+    pp = (fromJust newPosition, newSanMoves, newUciMoves, san)
     newSanMoves = _amSanMoves <> numberText <> " " <> san
     newFEN = pack $ toFEN $ fromJust newPosition
     numberText = if color _amChessPosition == White
@@ -170,6 +181,10 @@ runNextPlyHandle model@(AppModel{..}) = response where
         else (if _amSanMoves == "" then "1..." else "")
     number = showt $ moveNumber _amChessPosition
     san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
+    newUciMoves = uciMoves <> " " <> toUCI (fromJust _amNextPly)
+    (_, _, uciMoves, _) = head cutOffPreviousPositions
+    cutOffPreviousPositions = drop i _amPreviousPositions
+    i = length _amPreviousPositions - _amCurrentPlyNumber - 1
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model@(AppModel{..}) = response where
@@ -214,8 +229,9 @@ plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
                 & forsythEdwards .~ pack (toFEN previousPosition)
                 & aiData . positionEvaluation .~ Nothing
             , Event AppSyncBoard
+            , Event AppRunAnalysis
             ]
-    (previousPosition, moves, _) = _amPreviousPositions!!(l-newPlyNumber-1)
+    (previousPosition, moves, _, _) = _amPreviousPositions!!(l-newPlyNumber-1)
     l = length _amPreviousPositions
 
 undoMoveHandle :: EventHandle
@@ -232,8 +248,9 @@ undoMoveHandle model@(AppModel{..}) = response where
                 & forsythEdwards .~ pack (toFEN previousPosition)
                 & aiData . positionEvaluation .~ Nothing
             , Event AppSyncBoard
+            , Event AppRunAnalysis
             ]
-    (previousPosition, moves, _) = _amPreviousPositions!!1
+    (previousPosition, moves, _, _) = _amPreviousPositions!!1
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where
@@ -266,3 +283,31 @@ updateFenHandle :: EventHandle
 updateFenHandle model@(AppModel{..}) = response where
     response = [Model $ model & forsythEdwards .~ newFEN]
     newFEN = pack $ toFEN $ fromJust $ fromFEN $ getFenString _amFenData
+
+loadEngineHandle :: EventHandle
+loadEngineHandle AppModel{..} = [Producer producerHandler] where
+    producerHandler raiseEvent = loadUciEngine _amUciData $ f raiseEvent
+    f raiseEvent event = raiseEvent $ case event of
+        EventOutputReceived v -> AppUciOutputReceived v
+        EventReportError v -> AppSetErrorMessage $ Just v
+        EventSetRequestMVar v -> AppSetRequestMVar v
+        EventSetPV v -> AppSetPrincipalVariations v
+
+uciOutputReceivedHandle :: String -> EventHandle
+uciOutputReceivedHandle uciOutput model = response where
+    response = [Model $ model & uciData . principalVariations %~ f]
+    f = getNewPrincipalVariations uciOutput
+
+setRequestMVarHandle :: Maybe (MVar String) -> EventHandle
+setRequestMVarHandle v model = [Model $ model & uciData . requestMVar .~ v]
+
+setPrincipalVariationsHandle :: [String] -> EventHandle
+setPrincipalVariationsHandle v model = response where
+    response = [Model $ model & uciData . principalVariations .~ v]
+
+runAnalysisHandle :: EventHandle
+runAnalysisHandle AppModel{..} = [Producer producerHandler] where
+    producerHandler _ = uciRequestAnalysis _amUciData p uciMoves
+    (p, _, _, _) = last _amPreviousPositions
+    (_, _, uciMoves, _) = _amPreviousPositions!!(l-_amCurrentPlyNumber-1)
+    l = length _amPreviousPositions

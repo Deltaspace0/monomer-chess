@@ -11,34 +11,21 @@ module Model.AI
     , mctsRuns
     , minimaxDepth
     , positionEvaluation
-    , uciEnginePath
-    , uciEngineDepth
-    , uciLogs
     , aiMessage
     , initAI
     , calculateMove
     ) where
 
-import Control.Concurrent
 import Control.DeepSeq
-import Control.Exception
 import Control.Lens
-import Control.Monad
-import Data.List
-import Data.Maybe
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text)
 import Game.Chess
 import GHC.Generics
-import Numeric
-import System.IO
-import System.Directory
-import System.Process
 import System.Random
-import System.Timeout
 import TextShow
 
-import Model.AI.Minimax
 import Model.AI.MCTS
+import Model.AI.Minimax
 
 data ResponseMethod
     = RandomResponse
@@ -60,9 +47,6 @@ data AIData = AIData
     , _adPositionEvaluation :: Maybe Text
     , _adResponsePly :: Maybe Ply
     , _adAiMessage :: Maybe Text
-    , _adUciEnginePath :: Text
-    , _adUciEngineDepth :: Int
-    , _adUciLogs :: Bool
     } deriving (Eq, Show, Generic)
 
 instance NFData Ply where
@@ -81,9 +65,6 @@ initAI = AIData
     , _adPositionEvaluation = Nothing
     , _adResponsePly = Nothing
     , _adAiMessage = Nothing
-    , _adUciEnginePath = ""
-    , _adUciEngineDepth = 20
-    , _adUciLogs = False
     }
 
 calculateMove :: Position -> AIData -> IO AIData
@@ -96,12 +77,9 @@ calculateMove pos aiData@(AIData{..}) = result where
             & responsePly .~ mmPly
         MCTSResponse -> mctsMove pos _adMctsRuns <&> \x -> cleanData
             & responsePly .~ x
-        UCIResponse -> uciResponse <&> \(uciPly, uciEval, msg) -> cleanData
-            & positionEvaluation .~ uciEval
-            & responsePly .~ uciPly
-            & aiMessage .~ msg
+        UCIResponse -> pure $ cleanData
+            & responsePly .~ Nothing
     (mmPly, eval) = minimaxMove pos _adMinimaxDepth
-    uciResponse = uciMove pos _adUciEngineDepth _adUciEnginePath _adUciLogs
     cleanData = aiData
         & positionEvaluation .~ Nothing
         & aiMessage .~ Nothing
@@ -112,100 +90,3 @@ randomMove position = result where
         then pure Nothing
         else Just . (legal!!) <$> randomRIO (0, length legal-1)
     legal = legalPlies position
-
-uciMove
-    :: Position
-    -> Int
-    -> Text
-    -> Bool
-    -> IO (Maybe Ply, Maybe Text, Maybe Text)
-uciMove position depth path recordLogs = result where
-    result = uciProcess >>= \processResult -> case processResult of
-        Left _ -> return $ msg "Can't run the engine"
-        Right (Just hin, Just hout, Just herr, _) -> uciTalk hin hout herr
-    uciTalk hin hout herr = do
-        hSetBuffering hin LineBuffering
-        hPutStrLn hin "uci"
-        mvar <- newEmptyMVar
-        evar <- newEmptyMVar
-        let readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
-            readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
-            logErrorOutput = readErrEOF $ \x -> do
-                appendFile "logs_uci/errors.txt" $ x <> "\n"
-                logErrorOutput
-            waitForUciOk = readNotEOF $ \x -> do
-                when recordLogs $
-                    appendFile "logs_uci/outputs.txt" $ x <> "\n"
-                if x == "uciok"
-                    then putMVar mvar x
-                    else waitForUciOk
-            waitForReadyOk = do
-                hPutStrLn hin "isready"
-                readNotEOF $ \x -> do
-                    when recordLogs $
-                        appendFile "logs_uci/outputs.txt" $ x <> "\n"
-                    if x == "readyok"
-                        then putMVar mvar x
-                        else threadDelay 500000 >> waitForReadyOk
-            waitForBestMove = hIsEOF hout >>= \eof -> if eof
-                then putMVar mvar "eof"
-                else do
-                    x <- hGetLine hout
-                    when recordLogs $
-                        appendFile "logs_uci/outputs.txt" $ x <> "\n"
-                    let ws = words x
-                    when ("score" `elem` ws) $ do
-                        _ <- tryTakeMVar evar
-                        putMVar evar ws
-                    if head ws == "bestmove"
-                        then putMVar mvar $ ws!!1
-                        else waitForBestMove
-            sendGoDepth = do
-                hPutStrLn hin $ "go depth " <> show depth
-                _ <- forkIO waitForBestMove
-                uciNotation <- takeMVar mvar
-                uciEval <- (extractUciEval position <$>) <$> tryTakeMVar evar
-                return $ if uciNotation == "eof"
-                    then msg "Unexpected EOF"
-                    else (fromUCI position uciNotation, uciEval, Nothing)
-            sendPositionFen = do
-                hPutStrLn hin $ "position fen " <> toFEN position
-                _ <- forkIO waitForReadyOk
-                response <- timeout 5000000 $ takeMVar mvar
-                if null response
-                    then return $ msg "isready timeout"
-                    else sendGoDepth
-        when recordLogs $ do
-            createDirectoryIfMissing True "logs_uci"
-            _ <- forkIO logErrorOutput
-            return ()
-        _ <- forkIO waitForUciOk
-        response <- timeout 2000000 $ takeMVar mvar
-        if null response
-            then return $ msg "No support for UCI"
-            else sendPositionFen
-    uciProcess = try' $ createProcess (proc (unpack path) [])
-        { std_out = CreatePipe
-        , std_in = CreatePipe
-        , std_err = CreatePipe
-        }
-    try' = try :: IO a -> IO (Either IOException a)
-    msg x = (Nothing, Nothing, Just x)
-
-extractUciEval :: Position -> [String] -> Text
-extractUciEval position ws
-    | s > length ws-3 = "error - invalid UCI"
-    | evalType == "cp" = c <> " has advantage of " <> cpNumberText
-    | evalType == "mate" = c <> " mates in " <> mateNumberText <> " moves"
-    | otherwise = "error - unknown score type"
-    where
-        mateNumberText = showt $ abs mateNumber
-        mateNumber = read evalNumber :: Int
-        cpNumberText = pack $ showFFloat Nothing (abs cpNumber) ""
-        cpNumber = (read evalNumber :: Double)/100
-        evalType = ws!!(s+1)
-        evalNumber = ws!!(s+2)
-        s = fromJust $ elemIndex "score" ws
-        c = pack $ show $ if mateNumber > 0
-            then color position
-            else opponent $ color position

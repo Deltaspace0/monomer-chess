@@ -10,6 +10,7 @@ import Game.Chess
 import Monomer hiding (Color)
 import Monomer.Checkerboard
 import Monomer.Dragboard
+import TextShow
 
 import Composites
 import Model
@@ -30,12 +31,11 @@ buildUI _ model@(AppModel{..}) = tree where
                         [ label gameTurnText
                         , box_ [alignRight] editButton
                         ]
+                , separatorLine
+                , vscroll_ [wheelRate 32] $ vstack' variationLabels
                 ]
             , widgetIf _amShowPromotionMenu $
                 alert (AppSetPromotionMenu False) promotionMenu
-            , widgetIf (not $ null _amErrorMessage) $
-                alertMsg (fromMaybe "" _amErrorMessage) $
-                    AppSetErrorMessage Nothing
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
         , vstack'
@@ -44,7 +44,12 @@ buildUI _ model@(AppModel{..}) = tree where
             , moveHistoryPanel
             ]
         , separatorLine
-        , rightPanel
+        , zstack
+            [ rightPanel
+            , widgetIf (not $ null _amErrorMessage) $
+                alertMsg (fromMaybe "" _amErrorMessage) $
+                    AppSetErrorMessage Nothing
+            ]
         ] `styleBasic` [padding 16]
     keyShortcuts =
         [ ("Left", AppPlyNumberChanged $ _amCurrentPlyNumber-1)
@@ -52,6 +57,8 @@ buildUI _ model@(AppModel{..}) = tree where
         , ("Up", AppPlyNumberChanged 0)
         , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
         ]
+    variationLabels = label . extract <$> _uciPrincipalVariations
+    extract = extractUciInfo _amChessPosition
     moveHistoryButtons = hgrid'
         [ button "<<" (AppPlyNumberChanged 0)
             `nodeEnabled` notFirstPosition
@@ -83,13 +90,13 @@ buildUI _ model@(AppModel{..}) = tree where
                     [onChange AppPlyNumberChanged]
             ] `styleBasic` [sizeReqW $ fixedSize 164]
         ] where
-            (_, _, t1) = _amPreviousPositions!!(l-i1)
-            (_, _, t2) = _amPreviousPositions!!(l-i2)
+            (_, _, _, t1) = _amPreviousPositions!!(l-i1)
+            (_, _, _, t2) = _amPreviousPositions!!(l-i2)
             l = length _amPreviousPositions-1
             (i1, i2) = if firstMoveColor == White
                 then (i*2+1, i*2+2)
                 else (i*2, i*2+1)
-    firstMoveColor = let (p, _, _) = last _amPreviousPositions in color p
+    firstMoveColor = let (p, _, _, _) = last _amPreviousPositions in color p
     rightPanel = vstack' $ if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`
@@ -128,11 +135,15 @@ buildUI _ model@(AppModel{..}) = tree where
     gameControlPanel = vstack'
         [ buttonPanel
         , separatorLine
-        , labeledCheckbox_ "Rotate board" boardRotated [textRight]
-        , labeledCheckbox_ "Auto promote to queen" autoQueen [textRight]
-        , labeledCheckbox_ "Auto respond" autoRespond [textRight]
-        , separatorLine
-        , aiPanel aiData
+        , vscroll_ [wheelRate 32] $ vstack'
+            [ labeledCheckbox_ "Rotate board" boardRotated [textRight]
+            , labeledCheckbox_ "Auto promote to queen" autoQueen [textRight]
+            , labeledCheckbox_ "Auto respond" autoRespond [textRight]
+            , separatorLine
+            , aiPanel aiData
+            , separatorLine
+            , uciPanel
+            ] `styleBasic` [padding 8]
         ]
     buttonPanel = vstack' $ if _amShowEditMenu
         then
@@ -231,3 +242,24 @@ buildUI _ model@(AppModel{..}) = tree where
         else button "Edit position" $ AppSetEditMenu True)
             `nodeEnabled` not _amCalculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
+    uciPanel = vstack_ [childSpacing_ 16]
+        [ label "UCI engine settings"
+        , hstack_ [childSpacing_ 16]
+            [ label "Path: "
+            , textField $ uciData . enginePath
+            , button "Load" AppLoadEngine
+            ]
+        , label $ if null _uciRequestMVar
+            then "UCI engine is not loaded"
+            else "UCI engine is loaded"
+        , labeledCheckbox "Record UCI logs" $ uciData . makeLogs
+        , hgrid_ [childSpacing_ 16]
+            [ label $ "Engine depth: " <> (showt _uciEngineDepth)
+            , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]
+            ]
+        , hgrid_ [childSpacing_ 16]
+            [ label $ "Number of variations: " <> (showt _uciEngineLines)
+            , hslider_ (uciData . engineLines) 1 10 [dragRate 1]
+            ]
+        ]
+    UCIData{..} = _amUciData
