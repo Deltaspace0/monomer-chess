@@ -16,7 +16,6 @@ module Model.UCI
     , loadUciEngine
     , getNewPrincipalVariations
     , uciRequestAnalysis
-    , extractUciInfo
     ) where
 
 import Control.Concurrent
@@ -39,7 +38,7 @@ data UCIEvent
     = EventOutputReceived String
     | EventReportError Text
     | EventSetRequestMVar (Maybe (MVar String))
-    | EventSetPV [String]
+    | EventSetPV [Text]
     deriving (Eq, Show)
 
 data UCIData = UCIData
@@ -47,7 +46,7 @@ data UCIData = UCIData
     , _uciEngineDepth :: Int
     , _uciEngineLines :: Int
     , _uciMakeLogs :: Bool
-    , _uciPrincipalVariations :: [String]
+    , _uciPrincipalVariations :: [Text]
     , _uciRequestMVar :: Maybe (MVar String)
     } deriving (Eq, Show)
 
@@ -126,33 +125,16 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 raiseEvent $ EventSetRequestMVar $ Just rvar
                 uciRequestLoop
 
-getNewPrincipalVariations :: String -> [String] -> [String]
-getNewPrincipalVariations uciOutput variations = newVariations where
+getNewPrincipalVariations :: Position -> String -> [Text] -> [Text]
+getNewPrincipalVariations position uciOutput variations = newVariations where
     newVariations = if "multipv" `elem` ws
-        then (variations <> emptyLines) & ix (j-1) .~ uciOutput
+        then (variations <> emptyLines) & ix (j-1) .~ uciInfo
         else variations
-    emptyLines = take (j-length variations) $ repeat ""
+    emptyLines = take (j-length variations) $ repeat "..."
     j = read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
-    ws = words uciOutput
-
-uciRequestAnalysis :: UCIData -> Position -> String -> IO ()
-uciRequestAnalysis UCIData{..} position uciMoves = do
-    let rvar = fromJust _uciRequestMVar
-        multiReq = "setoption name MultiPV value " <> (show _uciEngineLines)
-        posReq = "position fen " <> (toFEN position) <> " moves" <> uciMoves
-        goReq = "go depth " <> (show _uciEngineDepth)
-    unless (null _uciRequestMVar) $ do
-        putMVar rvar "stop"
-        putMVar rvar multiReq
-        putMVar rvar posReq
-        putMVar rvar goReq
-
-extractUciInfo :: Position -> String -> Text
-extractUciInfo position uciOutput = result where
-    result
-        | uciOutput == "" = "..."
-        | and conditions = evaluationText <> " " <> movesText
-        | otherwise = "error - invalid UCI"
+    uciInfo = if and conditions
+        then evaluationText <> " " <> movesText
+        else "error - invalid UCI"
     conditions =
         [ "score" `elem` ws
         , "pv" `elem` ws
@@ -185,3 +167,15 @@ extractUciInfo position uciOutput = result where
     uciMoves = drop (fromJust (elemIndex "pv" ws) + 1) ws
     si = fromJust $ elemIndex "score" ws
     ws = words uciOutput
+
+uciRequestAnalysis :: UCIData -> Position -> String -> IO ()
+uciRequestAnalysis UCIData{..} position uciMoves = do
+    let rvar = fromJust _uciRequestMVar
+        multiReq = "setoption name MultiPV value " <> (show _uciEngineLines)
+        posReq = "position fen " <> (toFEN position) <> " moves" <> uciMoves
+        goReq = "go depth " <> (show _uciEngineDepth)
+    unless (null _uciRequestMVar) $ do
+        putMVar rvar "stop"
+        putMVar rvar multiReq
+        putMVar rvar posReq
+        putMVar rvar goReq

@@ -32,7 +32,8 @@ buildUI _ model@(AppModel{..}) = tree where
                         , box_ [alignRight] editButton
                         ]
                 , separatorLine
-                , vscroll_ [wheelRate 32] $ vstack' variationLabels
+                , vscroll_ [wheelRate 32] $ vstack' $
+                    label <$> _uciPrincipalVariations
                 ]
             , widgetIf _amShowPromotionMenu $
                 alert (AppSetPromotionMenu False) promotionMenu
@@ -57,8 +58,6 @@ buildUI _ model@(AppModel{..}) = tree where
         , ("Up", AppPlyNumberChanged 0)
         , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
         ]
-    variationLabels = label . extract <$> _uciPrincipalVariations
-    extract = extractUciInfo _amChessPosition
     moveHistoryButtons = hgrid'
         [ button "<<" (AppPlyNumberChanged 0)
             `nodeEnabled` notFirstPosition

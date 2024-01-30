@@ -40,7 +40,7 @@ data AppEvent
     | AppLoadEngine
     | AppUciOutputReceived String
     | AppSetRequestMVar (Maybe (MVar String))
-    | AppSetPrincipalVariations [String]
+    | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
     deriving (Eq, Show)
 
@@ -294,14 +294,14 @@ loadEngineHandle AppModel{..} = [Producer producerHandler] where
         EventSetPV v -> AppSetPrincipalVariations v
 
 uciOutputReceivedHandle :: String -> EventHandle
-uciOutputReceivedHandle uciOutput model = response where
+uciOutputReceivedHandle uciOutput model@(AppModel{..}) = response where
     response = [Model $ model & uciData . principalVariations %~ f]
-    f = getNewPrincipalVariations uciOutput
+    f = getNewPrincipalVariations _amChessPosition uciOutput
 
 setRequestMVarHandle :: Maybe (MVar String) -> EventHandle
 setRequestMVarHandle v model = [Model $ model & uciData . requestMVar .~ v]
 
-setPrincipalVariationsHandle :: [String] -> EventHandle
+setPrincipalVariationsHandle :: [Text] -> EventHandle
 setPrincipalVariationsHandle v model = response where
     response = [Model $ model & uciData . principalVariations .~ v]
 
