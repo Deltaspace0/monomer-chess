@@ -38,8 +38,8 @@ data AppEvent
     | AppClearEditBoard
     | AppUpdateFEN
     | AppLoadEngine
-    | AppUciOutputReceived String
     | AppSetRequestMVar (Maybe (MVar String))
+    | AppSetPositionMVar (Maybe (MVar Position))
     | AppSetCurrentEngineDepth (Maybe Text)
     | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
@@ -68,8 +68,8 @@ handleEvent _ _ model event = case event of
     AppClearEditBoard -> clearEditBoardHandle model
     AppUpdateFEN -> updateFenHandle model
     AppLoadEngine -> loadEngineHandle model
-    AppUciOutputReceived v -> uciOutputReceivedHandle v model
     AppSetRequestMVar v -> setRequestMVarHandle v model
+    AppSetPositionMVar v -> setPositionMVarHandle v model
     AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
     AppRunAnalysis -> runAnalysisHandle model
@@ -290,23 +290,17 @@ loadEngineHandle :: EventHandle
 loadEngineHandle AppModel{..} = [Producer producerHandler] where
     producerHandler raiseEvent = loadUciEngine _amUciData $ f raiseEvent
     f raiseEvent event = raiseEvent $ case event of
-        EventOutputReceived v -> AppUciOutputReceived v
         EventReportError v -> AppSetErrorMessage $ Just v
         EventSetRequestMVar v -> AppSetRequestMVar v
+        EventSetPositionMVar v -> AppSetPositionMVar v
         EventSetCurrentDepth v -> AppSetCurrentEngineDepth v
         EventSetPV v -> AppSetPrincipalVariations v
 
-uciOutputReceivedHandle :: String -> EventHandle
-uciOutputReceivedHandle uciOutput model@(AppModel{..}) = response where
-    response =
-        [ Model $ model
-            & uciData . currentEngineDepth %~ getUciDepth uciOutput
-            & uciData . principalVariations %~ f
-        ]
-    f = getNewPrincipalVariations _amChessPosition uciOutput
-
 setRequestMVarHandle :: Maybe (MVar String) -> EventHandle
 setRequestMVarHandle v model = [Model $ model & uciData . requestMVar .~ v]
+
+setPositionMVarHandle :: Maybe (MVar Position) -> EventHandle
+setPositionMVarHandle v model = [Model $ model & uciData . positionMVar .~ v]
 
 setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
 setCurrentEngineDepthHandle v model = response where
@@ -318,7 +312,7 @@ setPrincipalVariationsHandle v model = response where
 
 runAnalysisHandle :: EventHandle
 runAnalysisHandle AppModel{..} = [Producer producerHandler] where
-    producerHandler _ = uciRequestAnalysis _amUciData p uciMoves
-    (p, _, _, _) = last _amPreviousPositions
-    (_, _, uciMoves, _) = _amPreviousPositions!!(l-_amCurrentPlyNumber-1)
+    producerHandler _ = uciRequestAnalysis _amUciData initPos pos uciMoves
+    (initPos, _, _, _) = last _amPreviousPositions
+    (pos, _, uciMoves, _) = _amPreviousPositions!!(l-_amCurrentPlyNumber-1)
     l = length _amPreviousPositions

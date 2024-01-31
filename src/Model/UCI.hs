@@ -13,6 +13,7 @@ module Model.UCI
     , currentEngineDepth
     , principalVariations
     , requestMVar
+    , positionMVar
     , defaultUciData
     , loadUciEngine
     , getUciDepth
@@ -24,6 +25,7 @@ import Control.Concurrent
 import Control.Lens
 import Control.Exception
 import Control.Monad
+import Data.IORef
 import Data.List (elemIndex)
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
@@ -37,9 +39,9 @@ import System.Timeout
 import TextShow
 
 data UCIEvent
-    = EventOutputReceived String
-    | EventReportError Text
+    = EventReportError Text
     | EventSetRequestMVar (Maybe (MVar String))
+    | EventSetPositionMVar (Maybe (MVar Position))
     | EventSetCurrentDepth (Maybe Text)
     | EventSetPV [Text]
     deriving (Eq, Show)
@@ -52,6 +54,7 @@ data UCIData = UCIData
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVar :: Maybe (MVar String)
+    , _uciPositionMVar :: Maybe (MVar Position)
     } deriving (Eq, Show)
 
 instance Show (MVar a) where
@@ -68,6 +71,7 @@ defaultUciData = UCIData
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVar = Nothing
+    , _uciPositionMVar = Nothing
     }
 
 loadUciEngine :: UCIData -> (UCIEvent -> IO ()) -> IO ()
@@ -88,7 +92,16 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         hPutStrLn hin "uci"
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar
+        pvar <- newEmptyMVar
+        depthRef <- newIORef Nothing
+        pvRef <- newIORef []
         let reportError = raiseEvent . EventReportError
+            setCurrentDepth x = do
+                writeIORef depthRef x
+                raiseEvent $ EventSetCurrentDepth x
+            setPrincipalVariations x = do
+                writeIORef pvRef x
+                raiseEvent $ EventSetPV x
             readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
             readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
             logOutput x = appendFile "logs_uci/outputs.txt" $ x <> "\n"
@@ -103,16 +116,24 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
             uciOutputLoop = hIsEOF hout >>= \eof -> if eof
                 then do
                     raiseEvent $ EventSetRequestMVar Nothing
+                    raiseEvent $ EventSetPositionMVar Nothing
                     putMVar rvar "eof"
                 else do
                     x <- hGetLine hout
                     when _uciMakeLogs $ logOutput x
-                    raiseEvent $ EventOutputReceived x
+                    pos <- readMVar pvar
+                    let getNewPV = getNewPrincipalVariations pos
+                    atomicModifyIORef depthRef $ \v -> (getUciDepth x v, ())
+                    atomicModifyIORef pvRef $ \v -> (getNewPV x v, ())
                     uciOutputLoop
+            uciReportLoop = forever $ do
+                threadDelay 200000
+                readIORef depthRef >>= raiseEvent . EventSetCurrentDepth
+                readIORef pvRef >>= raiseEvent . EventSetPV
             uciRequestLoop = takeMVar rvar >>= \x -> unless (x == "eof") $ do
                 when ("position" `elem` (words x)) $ do
-                    raiseEvent $ EventSetCurrentDepth Nothing
-                    raiseEvent $ EventSetPV []
+                    setCurrentDepth Nothing
+                    setPrincipalVariations []
                 hPutStrLn hin x
                 uciRequestLoop
         when _uciMakeLogs $ do
@@ -128,7 +149,9 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     let rvarOld = fromJust _uciRequestMVar
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
+                _ <- forkIO uciReportLoop
                 raiseEvent $ EventSetRequestMVar $ Just rvar
+                raiseEvent $ EventSetPositionMVar $ Just pvar
                 uciRequestLoop
 
 getUciDepth :: String -> Maybe Text -> Maybe Text
@@ -183,13 +206,16 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
     si = fromJust $ elemIndex "score" ws
     ws = words uciOutput
 
-uciRequestAnalysis :: UCIData -> Position -> String -> IO ()
-uciRequestAnalysis UCIData{..} position uciMoves = do
+uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
+uciRequestAnalysis UCIData{..} initPos pos uciMoves = do
     let rvar = fromJust _uciRequestMVar
+        pvar = fromJust _uciPositionMVar
         multiReq = "setoption name MultiPV value " <> (show _uciEngineLines)
-        posReq = "position fen " <> (toFEN position) <> " moves" <> uciMoves
+        posReq = "position fen " <> (toFEN initPos) <> " moves" <> uciMoves
         goReq = "go depth " <> (show _uciEngineDepth)
-    unless (null _uciRequestMVar) $ do
+    unless (null _uciRequestMVar || null _uciPositionMVar) $ do
+        _ <- tryTakeMVar pvar
+        putMVar pvar pos
         putMVar rvar "stop"
         putMVar rvar multiReq
         putMVar rvar posReq
