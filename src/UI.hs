@@ -157,20 +157,21 @@ buildUI _ model@(AppModel{..}) = tree where
             ]
         else
             [ resetTwoBoardsButtons
-            , hgrid'
-                [ if _amCalculatingResponse
-                    then thinkButton
-                    else button "Play next response" AppPlayNextResponse
-                        `nodeEnabled` (not noLegalMoves)
-                , button "Undo move" AppUndoMove `nodeEnabled` all not
-                    [ length _amPreviousPositions < 2
-                    , _amCalculatingResponse
+            , hgrid' $ if calculatingResponse
+                then
+                    [ thinkButton
+                    , button "Abort response" AppAbortNextResponse
                     ]
-                ]
+                else
+                    [ button "Play next response" AppPlayNextResponse
+                        `nodeEnabled` (not noLegalMoves)
+                    , button "Undo move" AppUndoMove
+                        `nodeEnabled` (length _amPreviousPositions >= 2)
+                    ]
             ]
     resetTwoBoardsButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
-            `nodeEnabled` not _amCalculatingResponse
+            `nodeEnabled` not calculatingResponse
         , toggleButton "Two boards" showTwoBoards
         ]
     promotionMenu = vstack'
@@ -245,7 +246,7 @@ buildUI _ model@(AppModel{..}) = tree where
     editButton = (if _amShowEditMenu
         then button "Go back" $ AppSetEditMenu False
         else button "Edit position" $ AppSetEditMenu True)
-            `nodeEnabled` not _amCalculatingResponse
+            `nodeEnabled` not calculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
     uciPanel = vstack_ [childSpacing_ 16]
         [ label "UCI engine settings"
@@ -270,3 +271,4 @@ buildUI _ model@(AppModel{..}) = tree where
             ]
         ]
     UCIData{..} = _amUciData
+    calculatingResponse = isJust _amResponseThread

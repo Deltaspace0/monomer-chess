@@ -21,7 +21,7 @@ module Model.AppModel
     , autoQueen
     , boardRotated
     , autoRespond
-    , calculatingResponse
+    , responseThread
     , sanMoves
     , forsythEdwards
     , fenData
@@ -36,6 +36,7 @@ module Model.AppModel
     , chessPieces
     ) where
 
+import Control.Concurrent
 import Control.Lens
 import Game.Chess
 import Data.Text (pack, Text)
@@ -59,7 +60,7 @@ data AppModel = AppModel
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
     , _amAutoRespond :: Bool
-    , _amCalculatingResponse :: Bool
+    , _amResponseThread :: Maybe ThreadId
     , _amSanMoves :: Text
     , _amForsythEdwards :: Text
     , _amFenData :: FENData
@@ -84,7 +85,7 @@ initModel = AppModel
     , _amAutoQueen = False
     , _amBoardRotated = False
     , _amAutoRespond = True
-    , _amCalculatingResponse = False
+    , _amResponseThread = Nothing
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos
     , _amFenData = getFenData startpos

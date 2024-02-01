@@ -30,7 +30,9 @@ data AppEvent
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
+    | AppAbortNextResponse
     | AppResponseCalculated AIData
+    | AppSetResponseThread (Maybe ThreadId)
     | AppPlyNumberChanged Int
     | AppUndoMove
     | AppLoadFEN
@@ -61,7 +63,9 @@ handleEvent _ _ model event = case event of
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
+    AppAbortNextResponse -> abortNextResponseHandle model
     AppResponseCalculated v -> responseCalculatedHandle v model
+    AppSetResponseThread v -> setResponseThreadHandle v model
     AppPlyNumberChanged v -> plyNumberChangedHandle v model
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
@@ -101,7 +105,7 @@ syncBoardHandle model@(AppModel{..}) = response where
 
 boardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle r info model@(AppModel{..})
-    | _amCalculatingResponse = [Event AppSyncBoard]
+    | isJust _amResponseThread = [Event AppSyncBoard]
     | _amAutoQueen =
         [ setNextPly
         , Event AppRunNextPly
@@ -200,25 +204,40 @@ promoteHandle pieceType model@(AppModel{..}) = response where
         ]
 
 playNextResponseHandle :: EventHandle
-playNextResponseHandle model@(AppModel{..}) = response where
-    response =
-        [ Model $ model & calculatingResponse .~ True
-        , Task taskHandler
-        ]
-    taskHandler = do
-        result <- calculateMove _amChessPosition _amAiData
-        result `deepseq` pure ()
-        return $ AppResponseCalculated result
+playNextResponseHandle AppModel{..} = response where
+    response = [Producer producerHandler]
+    producerHandler raiseEvent = do
+        mvar <- newEmptyMVar
+        thread <- forkIO $ do
+            result <- calculateMove _amChessPosition _amAiData
+            result `deepseq` pure ()
+            raiseEvent $ AppResponseCalculated result
+            putMVar mvar ()
+        raiseEvent $ AppSetResponseThread $ Just thread
+        takeMVar mvar
+
+abortNextResponseHandle :: EventHandle
+abortNextResponseHandle model@(AppModel{..}) = response where
+    response = if null _amResponseThread
+        then []
+        else
+            [ Model $ model & responseThread .~ Nothing
+            , Producer producerHandler
+            ]
+    producerHandler _ = killThread $ fromJust _amResponseThread
 
 responseCalculatedHandle :: AIData -> EventHandle
 responseCalculatedHandle AIData{..} model =
     [ Model $ model
         & nextPly .~ _adResponsePly
-        & calculatingResponse .~ False
+        & responseThread .~ Nothing
         & aiData . positionEvaluation .~ _adPositionEvaluation
         & errorMessage .~ _adAiMessage
     , Event AppRunNextPly
     ]
+
+setResponseThreadHandle :: Maybe ThreadId -> EventHandle
+setResponseThreadHandle v model = [Model $ model & responseThread .~ v]
 
 plyNumberChangedHandle :: Int -> EventHandle
 plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
