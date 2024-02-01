@@ -7,6 +7,7 @@ module Model.UCI
     ( UCIEvent(..)
     , UCIData(..)
     , enginePath
+    , engineLoading
     , engineDepth
     , engineLines
     , makeLogs
@@ -40,6 +41,7 @@ import TextShow
 
 data UCIEvent
     = EventReportError Text
+    | EventSetEngineLoading Bool
     | EventSetRequestMVar (Maybe (MVar String))
     | EventSetPositionMVar (Maybe (MVar Position))
     | EventSetCurrentDepth (Maybe Text)
@@ -48,6 +50,7 @@ data UCIEvent
 
 data UCIData = UCIData
     { _uciEnginePath :: Text
+    , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
     , _uciEngineLines :: Int
     , _uciMakeLogs :: Bool
@@ -65,6 +68,7 @@ makeLensesWith abbreviatedFields 'UCIData
 defaultUciData :: UCIData
 defaultUciData = UCIData
     { _uciEnginePath = ""
+    , _uciEngineLoading = False
     , _uciEngineDepth = 20
     , _uciEngineLines = 1
     , _uciMakeLogs = False
@@ -79,13 +83,16 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
     loadAction = do
         let try' = try :: IO a -> IO (Either IOException a)
             path = unpack _uciEnginePath
+        raiseEvent $ EventSetEngineLoading True
         processResult <- try' $ createProcess (proc path [])
             { std_out = CreatePipe
             , std_in = CreatePipe
             , std_err = CreatePipe
             }
         case processResult of
-            Left _ -> raiseEvent $ EventReportError "Can't run the engine"
+            Left _ -> do
+                raiseEvent $ EventSetEngineLoading False
+                raiseEvent $ EventReportError "Can't run the engine"
             Right (Just hin, Just hout, Just herr, _) -> uciTalk hin hout herr
     uciTalk hin hout herr = do
         hSetBuffering hin LineBuffering
@@ -142,6 +149,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
             return ()
         _ <- forkIO waitForUciOk
         uciOutput <- timeout 2000000 $ takeMVar mvar
+        raiseEvent $ EventSetEngineLoading False
         if null uciOutput
             then reportError "No support for UCI"
             else do

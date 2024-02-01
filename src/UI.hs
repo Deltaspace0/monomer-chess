@@ -252,7 +252,9 @@ buildUI _ model@(AppModel{..}) = tree where
         , hstack_ [childSpacing_ 16]
             [ label "Path: "
             , textField $ uciData . enginePath
-            , button "Load" AppLoadEngine
+            , if _uciEngineLoading
+                then button "Wait" AppInit `nodeEnabled` False
+                else button "Load" AppLoadEngine
             ]
         , label $ if null _uciRequestMVar
             then "UCI engine is not loaded"
