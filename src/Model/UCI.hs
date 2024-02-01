@@ -170,10 +170,11 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
     j = if "multipv" `elem` ws
         then read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
         else 1
-    uciInfo = if and conditions
-        then evaluationText <> " " <> movesText
-        else "error - invalid UCI"
-    conditions =
+    uciInfo
+        | correctUci && movesText == "???" = ""
+        | correctUci = evaluationText <> " " <> movesText
+        | otherwise = "error - invalid UCI"
+    correctUci = and
         [ "score" `elem` ws
         , "pv" `elem` ws
         , si <= length ws-3
