@@ -4,7 +4,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.UCI
-    ( UCIEvent(..)
+    ( module Model.UCIOptions
+    , UCIEvent(..)
     , UCIData(..)
     , enginePath
     , engineLoading
@@ -14,6 +15,7 @@ module Model.UCI
     , principalVariations
     , requestMVars
     , engineLogChan
+    , optionsUCI
     , defaultUciData
     , loadUciEngine
     , getUciDepth
@@ -37,12 +39,15 @@ import System.Process
 import System.Timeout
 import TextShow
 
+import Model.UCIOptions
+
 data UCIEvent
     = EventReportError Text
     | EventSetEngineLoading Bool
     | EventSetRequestMVars (Maybe (MVar String, MVar Position))
     | EventSetCurrentDepth (Maybe Text)
     | EventSetPV [Text]
+    | EventSetOptionsUCI UCIOptions
     deriving (Eq, Show)
 
 data UCIData = UCIData
@@ -54,6 +59,7 @@ data UCIData = UCIData
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
     , _uciEngineLogChan :: Maybe (Chan String)
+    , _uciOptionsUCI :: UCIOptions
     } deriving (Eq, Show)
 
 instance Show (MVar a) where
@@ -74,6 +80,7 @@ defaultUciData = UCIData
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
     , _uciEngineLogChan = Nothing
+    , _uciOptionsUCI = initUciOptions []
     }
 
 loadUciEngine :: UCIData -> (UCIEvent -> IO ()) -> IO ()
@@ -101,6 +108,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         pvar <- newEmptyMVar
         depthRef <- newIORef Nothing
         pvRef <- newIORef []
+        optRef <- newIORef []
         let putLine x = do
                 hPutStrLn hin x
                 when logsEnabled $ writeChan logChan $ "stdin: " <> x
@@ -119,9 +127,15 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
             logErrorOutput = readErrEOF $ \x -> do
                 writeChan logChan $ "stderr: " <> x
                 logErrorOutput
-            waitForUciOk = readNotEOF $ \x -> if x == "uciok"
-                then putMVar mvar x
-                else waitForUciOk
+            waitForUciOk = readNotEOF $ \x -> do
+                let opt = parseUciOption x
+                    f v = if null opt
+                        then (v, ())
+                        else ((fromJust opt):v, ())
+                when ("option" `elem` words x) $ atomicModifyIORef optRef f
+                if x == "uciok"
+                    then putMVar mvar x
+                    else waitForUciOk
             uciOutputLoop = hIsEOF hout >>= \eof -> if eof
                 then do
                     raiseEvent $ EventSetRequestMVars Nothing
@@ -157,7 +171,9 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
                 reportThread <- forkIO uciReportLoop
+                opts <- initUciOptions . reverse <$> readIORef optRef
                 raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
+                raiseEvent $ EventSetOptionsUCI opts
                 uciRequestLoop
                 terminateProcess processHandle
                 killThread reportThread

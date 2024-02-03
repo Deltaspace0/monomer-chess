@@ -29,6 +29,7 @@ library
       Composites.AIPanel
       Composites.FlagPanel
       Composites.ThinkButton
+      Composites.UCIOptionsPanel
       Model
       Model.AI
       Model.AI.MCTS
@@ -38,6 +39,7 @@ library
       Model.AppModel
       Model.FENData
       Model.UCI
+      Model.UCIOptions
       UI
   other-modules:
       Paths_monomer_chess

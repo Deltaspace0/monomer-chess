@@ -284,6 +284,12 @@ buildUI _ model@(AppModel{..}) = tree where
             [ label $ "Number of variations: " <> (showt _uciEngineLines)
             , hslider_ (uciData . engineLines) 1 10 [dragRate 1]
             ]
+        , separatorLine
+        , label "UCI options"
+        , if null _uciRequestMVars
+            then label "Not available (UCI is not loaded)"
+            else uciOptionsPanel (uciData . optionsUCI) $
+                fst $ fromJust _uciRequestMVars
         ]
     UCIData{..} = _amUciData
     calculatingResponse = isJust _amResponseThread

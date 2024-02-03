@@ -50,6 +50,7 @@ data AppEvent
     | AppSetEngineLogChan (Maybe (Chan String))
     | AppSetCurrentEngineDepth (Maybe Text)
     | AppSetPrincipalVariations [Text]
+    | AppSetOptionsUCI UCIOptions
     | AppRunAnalysis
     | AppSendEngineRequest String
     | AppSetUciLogs Text
@@ -90,6 +91,7 @@ handleEvent _ _ model event = case event of
     AppSetEngineLogChan v -> setEngineLogChanHandle v model
     AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
+    AppSetOptionsUCI v -> setOptionsUCIHandle v model
     AppRunAnalysis -> runAnalysisHandle model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
     AppSetUciLogs v -> setUciLogsHandle v model
@@ -355,6 +357,7 @@ loadEngineHandle AppModel{..} = [Producer producerHandler] where
         EventSetRequestMVars v -> AppSetRequestMVars v
         EventSetCurrentDepth v -> AppSetCurrentEngineDepth v
         EventSetPV v -> AppSetPrincipalVariations v
+        EventSetOptionsUCI v -> AppSetOptionsUCI v
 
 setEngineLoadingHandle :: Bool -> EventHandle
 setEngineLoadingHandle v model = response where
@@ -374,6 +377,9 @@ setCurrentEngineDepthHandle v model = response where
 setPrincipalVariationsHandle :: [Text] -> EventHandle
 setPrincipalVariationsHandle v model = response where
     response = [Model $ model & uciData . principalVariations .~ v]
+
+setOptionsUCIHandle :: UCIOptions -> EventHandle
+setOptionsUCIHandle v model = [Model $ model & uciData . optionsUCI .~ v]
 
 runAnalysisHandle :: EventHandle
 runAnalysisHandle AppModel{..} = [Producer producerHandler] where
