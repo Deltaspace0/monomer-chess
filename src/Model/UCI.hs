@@ -81,8 +81,6 @@ defaultUciData = UCIData
 loadUciEngine :: UCIData -> (UCIEvent -> IO ()) -> IO ()
 loadUciEngine UCIData{..} raiseEvent = loadAction where
     loadAction = do
-        let try' = try :: IO a -> IO (Either IOException a)
-            path = unpack _uciEnginePath
         raiseEvent $ EventSetEngineLoading True
         processResult <- try' $ createProcess (proc path [])
             { std_out = CreatePipe
@@ -92,9 +90,12 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         case processResult of
             Left _ -> do
                 raiseEvent $ EventSetEngineLoading False
-                raiseEvent $ EventReportError "Can't run the engine"
-            Right (Just hin, Just hout, Just herr, _) -> uciTalk hin hout herr
-    uciTalk hin hout herr = do
+                reportError "Can't run the engine"
+            Right processHandles -> uciTalk processHandles
+    try' = try :: IO a -> IO (Either IOException a)
+    path = unpack _uciEnginePath
+    reportError = raiseEvent . EventReportError
+    uciTalk (Just hin, Just hout, Just herr, processHandle) = do
         hSetBuffering hin LineBuffering
         hPutStrLn hin "uci"
         mvar <- newEmptyMVar
@@ -102,8 +103,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         pvar <- newEmptyMVar
         depthRef <- newIORef Nothing
         pvRef <- newIORef []
-        let reportError = raiseEvent . EventReportError
-            setCurrentDepth x = do
+        let setCurrentDepth x = do
                 writeIORef depthRef x
                 raiseEvent $ EventSetCurrentDepth x
             setPrincipalVariations x = do
@@ -161,6 +161,8 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 raiseEvent $ EventSetRequestMVar $ Just rvar
                 raiseEvent $ EventSetPositionMVar $ Just pvar
                 uciRequestLoop
+                terminateProcess processHandle
+    uciTalk _ = reportError "Some IO handles were Nothing"
 
 getUciDepth :: String -> Maybe Text -> Maybe Text
 getUciDepth uciOutput depth = newDepth where

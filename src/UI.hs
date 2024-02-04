@@ -257,15 +257,18 @@ buildUI _ model@(AppModel{..}) = tree where
                 then button "Wait" AppInit `nodeEnabled` False
                 else button "Load" AppLoadEngine
             ]
-        , label $ if null _uciRequestMVar
-            then "UCI engine is not loaded"
-            else "UCI engine is loaded"
+        , if null _uciRequestMVar
+            then label "UCI engine is not loaded"
+            else hgrid'
+                [ button "Send 'stop' command" AppStopCommandEngine
+                , button "Halt engine" AppHaltEngine
+                ]
         , labeledCheckbox "Record UCI logs" $ uciData . makeLogs
-        , hgrid_ [childSpacing_ 16]
+        , hgrid'
             [ label $ "Engine depth: " <> (showt _uciEngineDepth)
             , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]
             ]
-        , hgrid_ [childSpacing_ 16]
+        , hgrid'
             [ label $ "Number of variations: " <> (showt _uciEngineLines)
             , hslider_ (uciData . engineLines) 1 10 [dragRate 1]
             ]

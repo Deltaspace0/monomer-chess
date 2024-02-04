@@ -46,6 +46,8 @@ data AppEvent
     | AppSetCurrentEngineDepth (Maybe Text)
     | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
+    | AppStopCommandEngine
+    | AppHaltEngine
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -79,6 +81,8 @@ handleEvent _ _ model event = case event of
     AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
     AppRunAnalysis -> runAnalysisHandle model
+    AppStopCommandEngine -> stopCommandEngineHandle model
+    AppHaltEngine -> haltEngineHandle model
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -342,3 +346,25 @@ runAnalysisHandle AppModel{..} = [Producer producerHandler] where
     (initPos, _, _, _) = last _amPreviousPositions
     (pos, _, uciMoves, _) = _amPreviousPositions!!(l-_amCurrentPlyNumber-1)
     l = length _amPreviousPositions
+
+stopCommandEngineHandle :: EventHandle
+stopCommandEngineHandle AppModel{..} = [Producer producerHandler] where
+    producerHandler _ = if null _uciRequestMVar
+        then return ()
+        else putMVar (fromJust _uciRequestMVar) "stop"
+    UCIData{..} = _amUciData
+
+haltEngineHandle :: EventHandle
+haltEngineHandle model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & uciData . currentEngineDepth .~ Nothing
+            & uciData . principalVariations .~ []
+            & uciData . requestMVar .~ Nothing
+            & uciData . positionMVar .~ Nothing
+        , Producer producerHandler
+        ]
+    producerHandler _ = if null _uciRequestMVar
+        then return ()
+        else putMVar (fromJust _uciRequestMVar) "eof"
+    UCIData{..} = _amUciData
