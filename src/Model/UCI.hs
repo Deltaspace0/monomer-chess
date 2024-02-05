@@ -159,10 +159,14 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     let rvarOld = fst $ fromJust _uciRequestMVars
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
-                _ <- forkIO uciReportLoop
+                reportThread <- forkIO uciReportLoop
                 raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
                 uciRequestLoop
                 terminateProcess processHandle
+                killThread reportThread
+                raiseEvent $ EventSetCurrentDepth Nothing
+                raiseEvent $ EventSetPV []
+                raiseEvent $ EventSetRequestMVars Nothing
     uciTalk _ = reportError "Some IO handles were Nothing"
 
 getUciDepth :: String -> Maybe Text -> Maybe Text

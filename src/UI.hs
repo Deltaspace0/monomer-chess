@@ -260,8 +260,8 @@ buildUI _ model@(AppModel{..}) = tree where
         , if null _uciRequestMVars
             then label "UCI engine is not loaded"
             else hgrid'
-                [ button "Send 'stop' command" AppStopCommandEngine
-                , button "Halt engine" AppHaltEngine
+                [ button "Send 'stop' command" $ AppSendEngineRequest "stop"
+                , button "Halt engine" $ AppSendEngineRequest "eof"
                 ]
         , labeledCheckbox "Record UCI logs" $ uciData . makeLogs
         , hgrid'
