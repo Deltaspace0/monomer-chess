@@ -27,6 +27,7 @@ module Model.AppModel
     , fenData
     , aiData
     , uciData
+    , uciLogs
     , initModel
     , isWhiteTurn
     , getPathOrColor
@@ -66,6 +67,7 @@ data AppModel = AppModel
     , _amFenData :: FENData
     , _amAiData :: AIData
     , _amUciData :: UCIData
+    , _amUciLogs :: Text
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -91,6 +93,7 @@ initModel = AppModel
     , _amFenData = getFenData startpos
     , _amAiData = initAI
     , _amUciData = defaultUciData
+    , _amUciLogs = ""
     }
 
 isWhiteTurn :: AppModel -> Bool

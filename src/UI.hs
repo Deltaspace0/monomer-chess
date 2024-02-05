@@ -138,9 +138,9 @@ buildUI _ model@(AppModel{..}) = tree where
         [ buttonPanel
         , separatorLine
         , vscroll_ [wheelRate 32] $ vstack'
-            [ labeledCheckbox_ "Rotate board" boardRotated [textRight]
-            , labeledCheckbox_ "Auto promote to queen" autoQueen [textRight]
-            , labeledCheckbox_ "Auto respond" autoRespond [textRight]
+            [ labeledCheckbox' "Rotate board" boardRotated
+            , labeledCheckbox' "Auto promote to queen" autoQueen
+            , labeledCheckbox' "Auto respond" autoRespond
             , separatorLine
             , aiPanel aiData
             , separatorLine
@@ -199,6 +199,7 @@ buildUI _ model@(AppModel{..}) = tree where
     hstack' = hstack_ [childSpacing_ 16]
     vstack' = vstack_ [childSpacing_ 16]
     hgrid' = hgrid_ [childSpacing_ 16]
+    labeledCheckbox' t l = labeledCheckbox_ t l [textRight]
     (chessBoardLeft, chessBoardRight) = if _amBoardRotated
         then (chessBoardR, chessBoard)
         else (chessBoard, chessBoardR)
@@ -263,7 +264,11 @@ buildUI _ model@(AppModel{..}) = tree where
                 [ button "Send 'stop' command" $ AppSendEngineRequest "stop"
                 , button "Halt engine" $ AppSendEngineRequest "eof"
                 ]
-        , labeledCheckbox "Record UCI logs" $ uciData . makeLogs
+        , separatorLine
+        , labeledCheckbox' "Record UCI logs" $ uciData . makeLogs
+        , widgetIf _uciMakeLogs $ textArea_ uciLogs [readOnly] `styleBasic`
+            [sizeReqH $ fixedSize 128]
+        , separatorLine
         , hgrid'
             [ label $ "Engine depth: " <> (showt _uciEngineDepth)
             , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]

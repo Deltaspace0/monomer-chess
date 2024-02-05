@@ -10,6 +10,7 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Lens
 import Control.Monad
+import Data.IORef
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
 import Game.Chess
@@ -49,6 +50,7 @@ data AppEvent
     | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
     | AppSendEngineRequest String
+    | AppSetUciLogs Text
     deriving (Eq, Show)
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
@@ -83,6 +85,7 @@ handleEvent _ _ model event = case event of
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
     AppRunAnalysis -> runAnalysisHandle model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
+    AppSetUciLogs v -> setUciLogsHandle v model
 
 initHandle :: EventHandle
 initHandle _ = [Producer producerHandler] where
@@ -90,9 +93,16 @@ initHandle _ = [Producer producerHandler] where
         createDirectoryIfMissing True "logs_uci"
         logChan <- newChan
         raiseEvent $ AppSetEngineLogChan $ Just logChan
+        logsListRef <- newIORef []
+        logsRef <- newIORef ""
+        _ <- forkIO $ forever $ do
+            threadDelay 500000
+            readIORef logsRef >>= raiseEvent . AppSetUciLogs
         forever $ do
             x <- readChan logChan
             appendFile "logs_uci/outputs.txt" $ x <> "\n"
+            modifyIORef logsListRef $ take 32 . (x:)
+            readIORef logsListRef >>= writeIORef logsRef . pack . unlines
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -363,3 +373,6 @@ sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where
         then return ()
         else putMVar (fst $ fromJust _uciRequestMVars) v
     UCIData{..} = _amUciData
+
+setUciLogsHandle :: Text -> EventHandle
+setUciLogsHandle v model = [Model $ model & uciLogs .~ v]
