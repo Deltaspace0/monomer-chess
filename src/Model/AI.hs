@@ -11,16 +11,13 @@ module Model.AI
     , mctsRuns
     , minimaxDepth
     , positionEvaluation
-    , aiMessage
     , initAI
     , calculateMove
     ) where
 
-import Control.DeepSeq
 import Control.Lens
 import Data.Text (Text)
 import Game.Chess
-import GHC.Generics
 import System.Random
 import TextShow
 
@@ -32,7 +29,7 @@ data ResponseMethod
     | MinimaxResponse
     | MCTSResponse
     | UCIResponse
-    deriving (Eq, Generic)
+    deriving Eq
 
 instance Show ResponseMethod where
     show RandomResponse = "Random moves"
@@ -45,15 +42,7 @@ data AIData = AIData
     , _adMctsRuns :: Int
     , _adMinimaxDepth :: Int
     , _adPositionEvaluation :: Maybe Text
-    , _adResponsePly :: Maybe Ply
-    , _adAiMessage :: Maybe Text
-    } deriving (Eq, Show, Generic)
-
-instance NFData Ply where
-    rnf x = x `seq` ()
-
-instance NFData ResponseMethod
-instance NFData AIData
+    } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AIData
 
@@ -63,26 +52,17 @@ initAI = AIData
     , _adMctsRuns = 2000
     , _adMinimaxDepth = 4
     , _adPositionEvaluation = Nothing
-    , _adResponsePly = Nothing
-    , _adAiMessage = Nothing
     }
 
-calculateMove :: Position -> AIData -> IO AIData
-calculateMove pos aiData@(AIData{..}) = result where
+calculateMove :: Position -> AIData -> IO (Maybe Ply, Maybe Text)
+calculateMove pos AIData{..} = result where
     result = case _adResponseMethod of
-        RandomResponse -> randomMove pos <&> \x -> cleanData
-            & responsePly .~ x
-        MinimaxResponse -> pure $ cleanData
-            & positionEvaluation .~ Just (showt eval)
-            & responsePly .~ mmPly
-        MCTSResponse -> mctsMove pos _adMctsRuns <&> \x -> cleanData
-            & responsePly .~ x
-        UCIResponse -> pure $ cleanData
-            & responsePly .~ Nothing
+        RandomResponse -> onlyPly <$> randomMove pos
+        MinimaxResponse -> pure (mmPly, Just $ showt eval)
+        MCTSResponse -> onlyPly <$> mctsMove pos _adMctsRuns
+        UCIResponse -> pure (Nothing, Nothing)
     (mmPly, eval) = minimaxMove pos _adMinimaxDepth
-    cleanData = aiData
-        & positionEvaluation .~ Nothing
-        & aiMessage .~ Nothing
+    onlyPly x = (x, Nothing)
 
 randomMove :: Position -> IO (Maybe Ply)
 randomMove position = result where

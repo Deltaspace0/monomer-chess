@@ -34,7 +34,7 @@ data AppEvent
     | AppPromote PieceType
     | AppPlayNextResponse
     | AppAbortNextResponse
-    | AppResponseCalculated AIData
+    | AppResponseCalculated (Maybe Ply, Maybe Text)
     | AppSetResponseThread (Maybe ThreadId)
     | AppPlyNumberChanged Int
     | AppUndoMove
@@ -52,6 +52,9 @@ data AppEvent
     | AppSendEngineRequest String
     | AppSetUciLogs Text
     deriving (Eq, Show)
+
+instance NFData Ply where
+    rnf x = x `seq` ()
 
 type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
 
@@ -250,13 +253,12 @@ abortNextResponseHandle model@(AppModel{..}) = response where
             ]
     producerHandler _ = killThread $ fromJust _amResponseThread
 
-responseCalculatedHandle :: AIData -> EventHandle
-responseCalculatedHandle AIData{..} model =
+responseCalculatedHandle :: (Maybe Ply, Maybe Text) -> EventHandle
+responseCalculatedHandle (responsePly, posEval) model =
     [ Model $ model
-        & nextPly .~ _adResponsePly
+        & nextPly .~ responsePly
         & responseThread .~ Nothing
-        & aiData . positionEvaluation .~ _adPositionEvaluation
-        & errorMessage .~ _adAiMessage
+        & aiData . positionEvaluation .~ posEval
     , Event AppRunNextPly
     ]
 
