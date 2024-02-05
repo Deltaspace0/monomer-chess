@@ -13,8 +13,7 @@ module Model.UCI
     , makeLogs
     , currentEngineDepth
     , principalVariations
-    , requestMVar
-    , positionMVar
+    , requestMVars
     , defaultUciData
     , loadUciEngine
     , getUciDepth
@@ -42,8 +41,7 @@ import TextShow
 data UCIEvent
     = EventReportError Text
     | EventSetEngineLoading Bool
-    | EventSetRequestMVar (Maybe (MVar String))
-    | EventSetPositionMVar (Maybe (MVar Position))
+    | EventSetRequestMVars (Maybe (MVar String, MVar Position))
     | EventSetCurrentDepth (Maybe Text)
     | EventSetPV [Text]
     deriving (Eq, Show)
@@ -56,8 +54,7 @@ data UCIData = UCIData
     , _uciMakeLogs :: Bool
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
-    , _uciRequestMVar :: Maybe (MVar String)
-    , _uciPositionMVar :: Maybe (MVar Position)
+    , _uciRequestMVars :: Maybe (MVar String, MVar Position)
     } deriving (Eq, Show)
 
 instance Show (MVar a) where
@@ -74,8 +71,7 @@ defaultUciData = UCIData
     , _uciMakeLogs = False
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
-    , _uciRequestMVar = Nothing
-    , _uciPositionMVar = Nothing
+    , _uciRequestMVars = Nothing
     }
 
 loadUciEngine :: UCIData -> (UCIEvent -> IO ()) -> IO ()
@@ -122,8 +118,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     else waitForUciOk
             uciOutputLoop = hIsEOF hout >>= \eof -> if eof
                 then do
-                    raiseEvent $ EventSetRequestMVar Nothing
-                    raiseEvent $ EventSetPositionMVar Nothing
+                    raiseEvent $ EventSetRequestMVars Nothing
                     putMVar rvar "eof"
                 else do
                     x <- hGetLine hout
@@ -153,13 +148,12 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         if null uciOutput
             then reportError "No support for UCI"
             else do
-                unless (null _uciRequestMVar) $ do
-                    let rvarOld = fromJust _uciRequestMVar
+                unless (null _uciRequestMVars) $ do
+                    let rvarOld = fst $ fromJust _uciRequestMVars
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
                 _ <- forkIO uciReportLoop
-                raiseEvent $ EventSetRequestMVar $ Just rvar
-                raiseEvent $ EventSetPositionMVar $ Just pvar
+                raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
                 uciRequestLoop
                 terminateProcess processHandle
     uciTalk _ = reportError "Some IO handles were Nothing"
@@ -219,12 +213,11 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
 
 uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
 uciRequestAnalysis UCIData{..} initPos pos uciMoves = do
-    let rvar = fromJust _uciRequestMVar
-        pvar = fromJust _uciPositionMVar
+    let (rvar, pvar) = fromJust _uciRequestMVars
         multiReq = "setoption name MultiPV value " <> (show _uciEngineLines)
         posReq = "position fen " <> (toFEN initPos) <> " moves" <> uciMoves
         goReq = "go depth " <> (show _uciEngineDepth)
-    unless (null _uciRequestMVar || null _uciPositionMVar) $ do
+    unless (null _uciRequestMVars) $ do
         _ <- tryTakeMVar pvar
         putMVar pvar pos
         putMVar rvar "stop"

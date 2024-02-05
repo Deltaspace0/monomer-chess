@@ -257,7 +257,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 then button "Wait" AppInit `nodeEnabled` False
                 else button "Load" AppLoadEngine
             ]
-        , if null _uciRequestMVar
+        , if null _uciRequestMVars
             then label "UCI engine is not loaded"
             else hgrid'
                 [ button "Send 'stop' command" AppStopCommandEngine
