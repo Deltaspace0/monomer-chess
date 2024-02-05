@@ -9,11 +9,13 @@ import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens
+import Control.Monad
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
+import System.Directory
 import TextShow
 
 import Model.AppModel
@@ -42,6 +44,7 @@ data AppEvent
     | AppLoadEngine
     | AppSetEngineLoading Bool
     | AppSetRequestMVars (Maybe (MVar String, MVar Position))
+    | AppSetEngineLogChan (Maybe (Chan String))
     | AppSetCurrentEngineDepth (Maybe Text)
     | AppSetPrincipalVariations [Text]
     | AppRunAnalysis
@@ -53,7 +56,7 @@ type EventHandle = AppModel -> [AppEventResponse AppModel AppEvent]
 
 handleEvent :: AppEventHandler AppModel AppEvent
 handleEvent _ _ model event = case event of
-    AppInit -> []
+    AppInit -> initHandle model
     AppSetPosition v -> setPositionHandle v model
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged r info -> boardChangedHandle r info model
@@ -76,11 +79,22 @@ handleEvent _ _ model event = case event of
     AppLoadEngine -> loadEngineHandle model
     AppSetEngineLoading v -> setEngineLoadingHandle v model
     AppSetRequestMVars v -> setRequestMVarsHandle v model
+    AppSetEngineLogChan v -> setEngineLogChanHandle v model
     AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
     AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
     AppRunAnalysis -> runAnalysisHandle model
     AppStopCommandEngine -> stopCommandEngineHandle model
     AppHaltEngine -> haltEngineHandle model
+
+initHandle :: EventHandle
+initHandle _ = [Producer producerHandler] where
+    producerHandler raiseEvent = do
+        createDirectoryIfMissing True "logs_uci"
+        logChan <- newChan
+        raiseEvent $ AppSetEngineLogChan $ Just logChan
+        forever $ do
+            x <- readChan logChan
+            appendFile "logs_uci/outputs.txt" $ x <> "\n"
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -325,6 +339,10 @@ setEngineLoadingHandle v model = response where
 
 setRequestMVarsHandle :: Maybe (MVar String, MVar Position) -> EventHandle
 setRequestMVarsHandle v model = [Model $ model & uciData . requestMVars .~ v]
+
+setEngineLogChanHandle :: Maybe (Chan String) -> EventHandle
+setEngineLogChanHandle v model = response where
+    response = [Model $ model & uciData . engineLogChan .~ v]
 
 setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
 setCurrentEngineDepthHandle v model = response where

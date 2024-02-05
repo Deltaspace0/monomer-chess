@@ -254,7 +254,7 @@ buildUI _ model@(AppModel{..}) = tree where
             [ label "Path: "
             , textField $ uciData . enginePath
             , if _uciEngineLoading
-                then button "Wait" AppInit `nodeEnabled` False
+                then button "Wait" AppLoadEngine `nodeEnabled` False
                 else button "Load" AppLoadEngine
             ]
         , if null _uciRequestMVars

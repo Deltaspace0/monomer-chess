@@ -14,6 +14,7 @@ module Model.UCI
     , currentEngineDepth
     , principalVariations
     , requestMVars
+    , engineLogChan
     , defaultUciData
     , loadUciEngine
     , getUciDepth
@@ -33,7 +34,6 @@ import Game.Chess
 import Game.Chess.SAN
 import Numeric
 import System.IO
-import System.Directory
 import System.Process
 import System.Timeout
 import TextShow
@@ -55,9 +55,13 @@ data UCIData = UCIData
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
+    , _uciEngineLogChan :: Maybe (Chan String)
     } deriving (Eq, Show)
 
 instance Show (MVar a) where
+    show _ = ""
+
+instance Show (Chan a) where
     show _ = ""
 
 makeLensesWith abbreviatedFields 'UCIData
@@ -72,6 +76,7 @@ defaultUciData = UCIData
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
+    , _uciEngineLogChan = Nothing
     }
 
 loadUciEngine :: UCIData -> (UCIEvent -> IO ()) -> IO ()
@@ -91,38 +96,41 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
     try' = try :: IO a -> IO (Either IOException a)
     path = unpack _uciEnginePath
     reportError = raiseEvent . EventReportError
+    logChan = fromJust _uciEngineLogChan
+    logsEnabled = _uciMakeLogs && (isJust _uciEngineLogChan)
     uciTalk (Just hin, Just hout, Just herr, processHandle) = do
-        hSetBuffering hin LineBuffering
-        hPutStrLn hin "uci"
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar
         pvar <- newEmptyMVar
         depthRef <- newIORef Nothing
         pvRef <- newIORef []
-        let setCurrentDepth x = do
+        let putLine x = do
+                hPutStrLn hin x
+                when logsEnabled $ writeChan logChan $ "stdin: " <> x
+            outGetLine = do
+                x <- hGetLine hout
+                when logsEnabled $ writeChan logChan $ "stdout: " <> x
+                return x
+            setCurrentDepth x = do
                 writeIORef depthRef x
                 raiseEvent $ EventSetCurrentDepth x
             setPrincipalVariations x = do
                 writeIORef pvRef x
                 raiseEvent $ EventSetPV x
-            readNotEOF f = hIsEOF hout >>= flip unless (hGetLine hout >>= f)
+            readNotEOF f = hIsEOF hout >>= flip unless (outGetLine >>= f)
             readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
-            logOutput x = appendFile "logs_uci/outputs.txt" $ x <> "\n"
             logErrorOutput = readErrEOF $ \x -> do
-                appendFile "logs_uci/errors.txt" $ x <> "\n"
+                writeChan logChan $ "stderr: " <> x
                 logErrorOutput
-            waitForUciOk = readNotEOF $ \x -> do
-                when _uciMakeLogs $ logOutput x
-                if x == "uciok"
-                    then putMVar mvar x
-                    else waitForUciOk
+            waitForUciOk = readNotEOF $ \x -> if x == "uciok"
+                then putMVar mvar x
+                else waitForUciOk
             uciOutputLoop = hIsEOF hout >>= \eof -> if eof
                 then do
                     raiseEvent $ EventSetRequestMVars Nothing
                     putMVar rvar "eof"
                 else do
-                    x <- hGetLine hout
-                    when _uciMakeLogs $ logOutput x
+                    x <- outGetLine
                     pos <- readMVar pvar
                     let getNewPV = getNewPrincipalVariations pos
                     atomicModifyIORef depthRef $ \v -> (getUciDepth x v, ())
@@ -136,12 +144,11 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 when ("position" `elem` (words x)) $ do
                     setCurrentDepth Nothing
                     setPrincipalVariations []
-                hPutStrLn hin x
+                putLine x
                 uciRequestLoop
-        when _uciMakeLogs $ do
-            createDirectoryIfMissing True "logs_uci"
-            _ <- forkIO logErrorOutput
-            return ()
+        hSetBuffering hin LineBuffering
+        putLine "uci"
+        when logsEnabled $ forkIO logErrorOutput >> return ()
         _ <- forkIO waitForUciOk
         uciOutput <- timeout 2000000 $ takeMVar mvar
         raiseEvent $ EventSetEngineLoading False
