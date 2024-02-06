@@ -41,6 +41,8 @@ import Control.Concurrent
 import Control.Lens
 import Game.Chess
 import Data.Text (pack, Text)
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import qualified Monomer as M
 
 import Model.AI
@@ -51,7 +53,7 @@ data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPreviousPositions :: [(Position, Text, String, Text)]
+    , _amPreviousPositions :: Seq (Position, Text, String, Text)
     , _amCurrentPlyNumber :: Int
     , _amNextPly :: Maybe Ply
     , _amShowTwoBoards :: Bool
@@ -77,7 +79,7 @@ initModel = AppModel
     { _amBoardState = getBoardState False startpos
     , _amBoardStateReversed = getBoardState True startpos
     , _amChessPosition = startpos
-    , _amPreviousPositions = [(startpos, "", "", "")]
+    , _amPreviousPositions = Seq.singleton (startpos, "", "", "")
     , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
     , _amShowTwoBoards = False

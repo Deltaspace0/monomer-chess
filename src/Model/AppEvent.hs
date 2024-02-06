@@ -12,12 +12,14 @@ import Control.Lens
 import Control.Monad
 import Data.IORef
 import Data.Maybe
+import Data.Sequence (Seq(..))
 import Data.Text (pack, unpack, Text)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
 import System.Directory
 import TextShow
+import qualified Data.Sequence as Seq
 
 import Model.AppModel
 
@@ -111,7 +113,7 @@ setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & previousPositions .~ [(position, "", "", "")]
+        & previousPositions .~ Seq.singleton (position, "", "", "")
         & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
         & sanMoves .~ ""
@@ -198,7 +200,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions .~ pp:cutOffPreviousPositions
+                & previousPositions .~ pp :<| cutOffPreviousPositions
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
@@ -217,9 +219,9 @@ runNextPlyHandle model@(AppModel{..}) = response where
     number = showt $ moveNumber _amChessPosition
     san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
     newUciMoves = uciMoves <> " " <> toUCI (fromJust _amNextPly)
-    (_, _, uciMoves, _) = head cutOffPreviousPositions
-    cutOffPreviousPositions = drop i _amPreviousPositions
-    i = length _amPreviousPositions - _amCurrentPlyNumber - 1
+    (_, _, uciMoves, _) :<| _ = cutOffPreviousPositions
+    cutOffPreviousPositions = Seq.drop i _amPreviousPositions
+    i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model@(AppModel{..}) = response where
@@ -280,26 +282,25 @@ plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
-    (previousPosition, moves, _, _) = _amPreviousPositions!!(l-newPlyNumber-1)
-    l = length _amPreviousPositions
+    (previousPosition, moves, _, _) = fromJust lookupResult
+    lookupResult = Seq.lookup (l-newPlyNumber-1) _amPreviousPositions
+    l = Seq.length _amPreviousPositions
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
-    response = if null _amPreviousPositions
-        then []
-        else
-            [ Model $ model
-                & chessPosition .~ previousPosition
-                & previousPositions .~ tail _amPreviousPositions
-                & currentPlyNumber .~ length _amPreviousPositions-2
-                & showPromotionMenu .~ False
-                & sanMoves .~ moves
-                & forsythEdwards .~ pack (toFEN previousPosition)
-                & aiData . positionEvaluation .~ Nothing
-            , Event AppSyncBoard
-            , Event AppRunAnalysis
-            ]
-    (previousPosition, moves, _, _) = _amPreviousPositions!!1
+    response =
+        [ Model $ model
+            & chessPosition .~ previousPosition
+            & previousPositions .~ Seq.drop 1 _amPreviousPositions
+            & currentPlyNumber .~ Seq.length _amPreviousPositions-2
+            & showPromotionMenu .~ False
+            & sanMoves .~ moves
+            & forsythEdwards .~ pack (toFEN previousPosition)
+            & aiData . positionEvaluation .~ Nothing
+        , Event AppSyncBoard
+        , Event AppRunAnalysis
+        ]
+    _ :<| (previousPosition, moves, _, _) :<| _ = _amPreviousPositions
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where
@@ -365,9 +366,9 @@ setPrincipalVariationsHandle v model = response where
 runAnalysisHandle :: EventHandle
 runAnalysisHandle AppModel{..} = [Producer producerHandler] where
     producerHandler _ = uciRequestAnalysis _amUciData initPos pos uciMoves
-    (initPos, _, _, _) = last _amPreviousPositions
-    (pos, _, uciMoves, _) = _amPreviousPositions!!(l-_amCurrentPlyNumber-1)
-    l = length _amPreviousPositions
+    _ :|> (initPos, _, _, _) = _amPreviousPositions
+    (pos, _, uciMoves, _) = fromJust $ Seq.lookup i _amPreviousPositions
+    i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
 
 sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where

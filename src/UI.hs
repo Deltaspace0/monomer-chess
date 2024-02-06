@@ -6,11 +6,13 @@ module UI
     ) where
 
 import Data.Maybe
+import Data.Sequence (Seq(..))
 import Game.Chess
 import Monomer hiding (Color)
 import Monomer.Checkerboard
 import Monomer.Dragboard
 import TextShow
+import qualified Data.Sequence as Seq
 
 import Composites
 import Model
@@ -55,30 +57,27 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ]
         ] `styleBasic` [padding 16]
-    keyShortcuts =
-        [ ("Left", AppPlyNumberChanged $ _amCurrentPlyNumber-1)
-        , ("Right", AppPlyNumberChanged $ _amCurrentPlyNumber+1)
-        , ("Up", AppPlyNumberChanged 0)
-        , ("Down", AppPlyNumberChanged $ length _amPreviousPositions-1)
-        ]
-    moveHistoryButtons = hgrid'
-        [ button "<<" (AppPlyNumberChanged 0)
-            `nodeEnabled` notFirstPosition
-        , button "<" (AppPlyNumberChanged $ _amCurrentPlyNumber-1)
-            `nodeEnabled` notFirstPosition
-        , button ">" (AppPlyNumberChanged $ _amCurrentPlyNumber+1)
-            `nodeEnabled` notLastPosition
-        , button ">>" (AppPlyNumberChanged $ length _amPreviousPositions-1)
-            `nodeEnabled` notLastPosition
+    keyShortcuts = zipWith (,) ["Up", "Left", "Right", "Down"] plyEvents
+    moveHistoryButtons = hgrid' $ zipWith ($)
+        [ flip nodeEnabled notFirstPosition . button "<<"
+        , flip nodeEnabled notFirstPosition . button "<"
+        , flip nodeEnabled notLastPosition . button ">"
+        , flip nodeEnabled notLastPosition . button ">>"
+        ] plyEvents
+    plyEvents = AppPlyNumberChanged <$>
+        [ 0
+        , _amCurrentPlyNumber-1
+        , _amCurrentPlyNumber+1
+        , Seq.length _amPreviousPositions-1
         ]
     notFirstPosition = _amCurrentPlyNumber > 0
-    notLastPosition = _amCurrentPlyNumber < length _amPreviousPositions-1
+    notLastPosition = _amCurrentPlyNumber < Seq.length _amPreviousPositions-1
     moveHistoryPanel = vscroll_ [wheelRate 32]
         (vstack_ [childSpacing_ 4] (makeHistoryLine <$> moveIndices))
             `styleBasic` [sizeReqW $ fixedSize 204]
     moveIndices = if firstMoveColor == White
-        then [0..(length _amPreviousPositions) `div` 2 - 1]
-        else [0..(length _amPreviousPositions + 1) `div` 2 - 1]
+        then [0..(Seq.length _amPreviousPositions) `div` 2 - 1]
+        else [0..(Seq.length _amPreviousPositions + 1) `div` 2 - 1]
     makeHistoryLine i = hstack
         [ labelS (i+1) `styleBasic` [sizeReqW $ fixedSize 30]
         , hgrid_ [childSpacing_ 4]
@@ -92,13 +91,13 @@ buildUI _ model@(AppModel{..}) = tree where
                     [onChange AppPlyNumberChanged]
             ] `styleBasic` [sizeReqW $ fixedSize 164]
         ] where
-            (_, _, _, t1) = _amPreviousPositions!!(l-i1)
-            (_, _, _, t2) = _amPreviousPositions!!(l-i2)
-            l = length _amPreviousPositions-1
+            (_, _, _, t1) = Seq.index _amPreviousPositions $ l-i1
+            (_, _, _, t2) = Seq.index _amPreviousPositions $ l-i2
+            l = Seq.length _amPreviousPositions-1
             (i1, i2) = if firstMoveColor == White
                 then (i*2+1, i*2+2)
                 else (i*2, i*2+1)
-    firstMoveColor = let (p, _, _, _) = last _amPreviousPositions in color p
+    firstMoveColor = let _ :|> (p, _, _, _) = _amPreviousPositions in color p
     rightPanel = vstack' $ if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`

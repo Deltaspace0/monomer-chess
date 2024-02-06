@@ -49,6 +49,7 @@ library
   build-depends:
       base >=4.7 && <5
     , chessIO
+    , containers
     , deepseq
     , directory
     , lens
@@ -73,6 +74,7 @@ executable monomer-chess-exe
   build-depends:
       base >=4.7 && <5
     , chessIO
+    , containers
     , deepseq
     , directory
     , lens
@@ -99,6 +101,7 @@ test-suite monomer-chess-test
   build-depends:
       base >=4.7 && <5
     , chessIO
+    , containers
     , deepseq
     , directory
     , lens
