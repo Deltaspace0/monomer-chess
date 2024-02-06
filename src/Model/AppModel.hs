@@ -76,8 +76,8 @@ makeLensesWith abbreviatedFields 'AppModel
 
 initModel :: AppModel
 initModel = AppModel
-    { _amBoardState = getBoardState False startpos
-    , _amBoardStateReversed = getBoardState True startpos
+    { _amBoardState = startState
+    , _amBoardStateReversed = startStateReversed
     , _amChessPosition = startpos
     , _amPreviousPositions = Seq.singleton (startpos, "", "", "")
     , _amCurrentPlyNumber = 0
@@ -96,7 +96,8 @@ initModel = AppModel
     , _amAiData = initAI
     , _amUciData = defaultUciData
     , _amUciLogs = ""
-    }
+    } where
+        (startState, startStateReversed) = getBoardStates startpos
 
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn AppModel{..} = color _amChessPosition == White

@@ -127,10 +127,11 @@ syncBoardHandle :: EventHandle
 syncBoardHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & boardState .~ getBoardState False _amChessPosition
-            & boardStateReversed .~ getBoardState True _amChessPosition
+            & boardState .~ newState
+            & boardStateReversed .~ newStateReversed
             & fenData .~ getFenData _amChessPosition
         ]
+    (newState, newStateReversed) = getBoardStates _amChessPosition
 
 boardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle r info model@(AppModel{..})
