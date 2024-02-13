@@ -84,9 +84,7 @@ pieceChar _ = '?'
 
 getBoardStates :: Position -> ([[Piece]], [[Piece]])
 getBoardStates position = (f <$> squares, f <$> rotatedSquares) where
-    f square = let p = pieceAt position square in if null p
-        then []
-        else [fromJust p]
+    f = maybeToList . pieceAt position
 
 getSquare :: Bool -> Int -> Square
 getSquare rotated = if rotated

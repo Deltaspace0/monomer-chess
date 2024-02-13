@@ -129,10 +129,8 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 logErrorOutput
             waitForUciOk = readNotEOF $ \x -> do
                 let opt = parseUciOption x
-                    f v = if null opt
-                        then (v, ())
-                        else ((fromJust opt):v, ())
-                when ("option" `elem` words x) $ atomicModifyIORef optRef f
+                when ("option" `elem` words x) $
+                    atomicModifyIORef optRef $ \v -> (maybe v (:v) opt, ())
                 if x == "uciok"
                     then putMVar mvar x
                     else waitForUciOk

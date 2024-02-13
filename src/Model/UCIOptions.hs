@@ -75,12 +75,8 @@ initUciOptions options = UCIOptions
 
 buildUciRequest :: OptionUCI -> String
 buildUciRequest opt = result where
-    result = "setoption name " <> caption <> valueText
-    valueText = if null value
-        then ""
-        else " value " <> fromJust value
-    caption = showCaption opt
-    value = showValue opt
+    result = "setoption name " <> (showCaption opt) <> valueText
+    valueText = maybe "" (" value " <>) $ showValue opt
 
 showCaption :: OptionUCI -> String
 showCaption (SpinUCI caption _ _ _) = caption

@@ -260,14 +260,10 @@ playNextResponseHandle AppModel{..} = response where
         takeMVar mvar
 
 abortNextResponseHandle :: EventHandle
-abortNextResponseHandle model@(AppModel{..}) = response where
-    response = if null _amResponseThread
-        then []
-        else
-            [ Model $ model & responseThread .~ Nothing
-            , Producer producerHandler
-            ]
-    producerHandler _ = killThread $ fromJust _amResponseThread
+abortNextResponseHandle model@(AppModel{..}) =
+    [ Model $ model & responseThread .~ Nothing
+    , Producer $ const $ maybe (pure ()) killThread _amResponseThread
+    ]
 
 responseCalculatedHandle :: (Maybe Ply, Maybe Text) -> EventHandle
 responseCalculatedHandle (responsePly, posEval) model =
