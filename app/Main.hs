@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Monomer
+import qualified Monomer.Lens as L
 
 import Model
 import UI
@@ -11,7 +12,7 @@ main = do
             [ appWindowState $ MainWindowNormal (1100, 640)
             , appWindowResizable False
             , appWindowTitle "Monomer chess"
-            , appTheme darkTheme
+            , appTheme $ setThemeValue L.scrollWheelRate 32 $ darkTheme
             , appFontDef "Regular" "./assets/font/laconic.otf"
             , appInitEvent AppInit
             ]

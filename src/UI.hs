@@ -37,8 +37,7 @@ buildUI _ model@(AppModel{..}) = tree where
                             ]
                         ]
                 , separatorLine
-                , vscroll_ [wheelRate 32] $ vstack' $
-                    label <$> _uciPrincipalVariations
+                , vscroll $ vstack' $ label <$> _uciPrincipalVariations
                 ]
             , widgetIf _amShowPromotionMenu $
                 alert (AppSetPromotionMenu False) promotionMenu
@@ -72,10 +71,9 @@ buildUI _ model@(AppModel{..}) = tree where
         ]
     notFirstPosition = _amCurrentPlyNumber > 0
     notLastPosition = _amCurrentPlyNumber < Seq.length _amPreviousPositions-1
-    moveHistoryPanel = vscroll_ [wheelRate 32]
-        (vstack_ [childSpacing_ 4] (makeHistoryLine <$> moveIndices))
-            `styleBasic` [sizeReqW $ fixedSize 204]
-    moveIndices = if firstMoveColor == White
+    moveHistoryPanel = vscroll (vstack_ [childSpacing_ 4] moveLines)
+        `styleBasic` [sizeReqW $ fixedSize 204]
+    moveLines = makeHistoryLine <$> if firstMoveColor == White
         then [0..(Seq.length _amPreviousPositions) `div` 2 - 1]
         else [0..(Seq.length _amPreviousPositions + 1) `div` 2 - 1]
     makeHistoryLine i = hstack
@@ -136,7 +134,7 @@ buildUI _ model@(AppModel{..}) = tree where
     gameControlPanel = vstack'
         [ buttonPanel
         , separatorLine
-        , vscroll_ [wheelRate 32] $ vstack'
+        , vscroll $ vstack'
             [ labeledCheckbox' "Rotate board" boardRotated
             , labeledCheckbox' "Auto promote to queen" autoQueen
             , labeledCheckbox' "Auto respond" autoRespond
