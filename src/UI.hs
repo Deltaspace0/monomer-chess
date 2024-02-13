@@ -278,10 +278,6 @@ buildUI _ model@(AppModel{..}) = tree where
             [ label $ "Engine depth: " <> (showt _uciEngineDepth)
             , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]
             ]
-        , hgrid'
-            [ label $ "Number of variations: " <> (showt _uciEngineLines)
-            , hslider_ (uciData . engineLines) 1 10 [dragRate 1]
-            ]
         , separatorLine
         , label "UCI options"
         , if null _uciRequestMVars

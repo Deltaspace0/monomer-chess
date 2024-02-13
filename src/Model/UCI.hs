@@ -10,7 +10,6 @@ module Model.UCI
     , enginePath
     , engineLoading
     , engineDepth
-    , engineLines
     , currentEngineDepth
     , principalVariations
     , requestMVars
@@ -54,7 +53,6 @@ data UCIData = UCIData
     { _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
-    , _uciEngineLines :: Int
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
@@ -75,7 +73,6 @@ defaultUciData = UCIData
     { _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
-    , _uciEngineLines = 1
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
@@ -169,7 +166,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
                 reportThread <- forkIO uciReportLoop
-                opts <- initUciOptions . reverse <$> readIORef optRef
+                opts <- initUciOptions . reorderUciOpts <$> readIORef optRef
                 raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
                 raiseEvent $ EventSetOptionsUCI opts
                 uciRequestLoop
@@ -179,6 +176,24 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 raiseEvent $ EventSetPV []
                 raiseEvent $ EventSetRequestMVars Nothing
     uciTalk _ = reportError "Some IO handles were Nothing"
+
+reorderUciOpts :: [OptionUCI] -> [OptionUCI]
+reorderUciOpts opts = commonOpts <> otherOpts where
+    (commonOpts, otherOpts) = processOpts opts
+    processOpts [] = ([], [])
+    processOpts (x:xs) = let (a, b) = processOpts xs in case replaceOpt x of
+        Left opt -> (opt:a, b)
+        Right opt -> (a, opt:b)
+    replaceOpt x = case x of
+        SpinUCI "MultiPV" _ _ _ -> Left $ x
+            { _spuSpinMinValue = 1
+            , _spuSpinMaxValue = 10
+            }
+        SpinUCI "Threads" _ _ _ -> Left $ x
+            { _spuSpinMinValue = 1
+            , _spuSpinMaxValue = 10
+            }
+        _ -> Right x
 
 getUciDepth :: String -> Maybe Text -> Maybe Text
 getUciDepth uciOutput depth = newDepth where
@@ -236,13 +251,11 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
 uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
 uciRequestAnalysis UCIData{..} initPos pos uciMoves = do
     let (rvar, pvar) = fromJust _uciRequestMVars
-        multiReq = "setoption name MultiPV value " <> (show _uciEngineLines)
         posReq = "position fen " <> (toFEN initPos) <> " moves" <> uciMoves
         goReq = "go depth " <> (show _uciEngineDepth)
     unless (null _uciRequestMVars) $ do
         _ <- tryTakeMVar pvar
         putMVar pvar pos
         putMVar rvar "stop"
-        putMVar rvar multiReq
         putMVar rvar posReq
         putMVar rvar goReq
