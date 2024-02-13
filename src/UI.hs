@@ -264,9 +264,12 @@ buildUI _ model@(AppModel{..}) = tree where
                 , button "Halt engine" $ AppSendEngineRequest "eof"
                 ]
         , separatorLine
-        , labeledCheckbox_ "Record UCI logs to file" uciRecordLogs
-            [ textRight
-            , onChange AppRecordUCILogsChanged
+        , zstack
+            [ labeledCheckbox_ "Record UCI logs to file" uciRecordLogs
+                [ textRight
+                , onChange AppRecordUCILogsChanged
+                ]
+            , box_ [alignRight] $ button "Clear" AppClearUciLogs
             ]
         , textArea_ uciLogs [readOnly] `styleBasic` [sizeReqH $ fixedSize 128]
         , separatorLine

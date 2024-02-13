@@ -53,6 +53,7 @@ data AppEvent
     | AppRunAnalysis
     | AppSendEngineRequest String
     | AppSetUciLogs Text
+    | AppClearUciLogs
     | AppRecordUCILogsChanged Bool
     deriving (Eq, Show)
 
@@ -92,6 +93,7 @@ handleEvent _ _ model event = case event of
     AppRunAnalysis -> runAnalysisHandle model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
     AppSetUciLogs v -> setUciLogsHandle v model
+    AppClearUciLogs -> clearUciLogsHandle model
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
 
 initHandle :: EventHandle
@@ -101,14 +103,17 @@ initHandle _ = [Producer producerHandler] where
         logChan <- newChan
         raiseEvent $ AppSetEngineLogChan $ Just logChan
         logsListRef <- newIORef []
-        recordRef <- newIORef False
         logsRef <- newIORef ""
+        recordRef <- newIORef False
         _ <- forkIO $ forever $ do
             threadDelay 500000
             readIORef logsRef >>= raiseEvent . AppSetUciLogs
         forever $ readChan logChan >>= \x -> case x of
             "monomer-record-uci-True" -> writeIORef recordRef True
             "monomer-record-uci-False" -> writeIORef recordRef False
+            "monomer-clear-uci-logs" -> do
+                writeIORef logsListRef []
+                writeIORef logsRef ""
             _ -> do
                 doRecord <- readIORef recordRef
                 when doRecord $ appendFile "logs_uci/outputs.txt" $ x <> "\n"
@@ -385,6 +390,16 @@ sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where
 
 setUciLogsHandle :: Text -> EventHandle
 setUciLogsHandle v model = [Model $ model & uciLogs .~ v]
+
+clearUciLogsHandle :: EventHandle
+clearUciLogsHandle model@(AppModel{..}) = response where
+    response =
+        [ Producer producerHandler
+        , Model $ model & uciLogs .~ ""
+        ]
+    producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
+    msg = "monomer-clear-uci-logs"
+    UCIData{..} = _amUciData
 
 recordUCILogsChangedHandle :: Bool -> EventHandle
 recordUCILogsChangedHandle v AppModel{..} = [Producer producerHandler] where
