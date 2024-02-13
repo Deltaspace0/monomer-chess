@@ -53,6 +53,7 @@ data AppEvent
     | AppRunAnalysis
     | AppSendEngineRequest String
     | AppSetUciLogs Text
+    | AppRecordUCILogsChanged Bool
     deriving (Eq, Show)
 
 instance NFData Ply where
@@ -91,6 +92,7 @@ handleEvent _ _ model event = case event of
     AppRunAnalysis -> runAnalysisHandle model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
     AppSetUciLogs v -> setUciLogsHandle v model
+    AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
 
 initHandle :: EventHandle
 initHandle _ = [Producer producerHandler] where
@@ -99,15 +101,19 @@ initHandle _ = [Producer producerHandler] where
         logChan <- newChan
         raiseEvent $ AppSetEngineLogChan $ Just logChan
         logsListRef <- newIORef []
+        recordRef <- newIORef False
         logsRef <- newIORef ""
         _ <- forkIO $ forever $ do
             threadDelay 500000
             readIORef logsRef >>= raiseEvent . AppSetUciLogs
-        forever $ do
-            x <- readChan logChan
-            appendFile "logs_uci/outputs.txt" $ x <> "\n"
-            modifyIORef logsListRef $ take 32 . (x:)
-            readIORef logsListRef >>= writeIORef logsRef . pack . unlines
+        forever $ readChan logChan >>= \x -> case x of
+            "monomer-record-uci-True" -> writeIORef recordRef True
+            "monomer-record-uci-False" -> writeIORef recordRef False
+            _ -> do
+                doRecord <- readIORef recordRef
+                when doRecord $ appendFile "logs_uci/outputs.txt" $ x <> "\n"
+                modifyIORef logsListRef $ take 32 . (x:)
+                readIORef logsListRef >>= writeIORef logsRef . pack . unlines
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -373,10 +379,15 @@ runAnalysisHandle AppModel{..} = [Producer producerHandler] where
 
 sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where
-    producerHandler _ = if null _uciRequestMVars
-        then return ()
-        else putMVar (fst $ fromJust _uciRequestMVars) v
+    producerHandler _ = maybe (pure ()) sendRequest _uciRequestMVars
+    sendRequest = flip putMVar v . fst
     UCIData{..} = _amUciData
 
 setUciLogsHandle :: Text -> EventHandle
 setUciLogsHandle v model = [Model $ model & uciLogs .~ v]
+
+recordUCILogsChangedHandle :: Bool -> EventHandle
+recordUCILogsChangedHandle v AppModel{..} = [Producer producerHandler] where
+    producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
+    msg = "monomer-record-uci-" <> (show v)
+    UCIData{..} = _amUciData

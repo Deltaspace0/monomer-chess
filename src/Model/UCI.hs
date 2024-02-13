@@ -10,7 +10,6 @@ module Model.UCI
     , engineLoading
     , engineDepth
     , engineLines
-    , makeLogs
     , currentEngineDepth
     , principalVariations
     , requestMVars
@@ -51,7 +50,6 @@ data UCIData = UCIData
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
     , _uciEngineLines :: Int
-    , _uciMakeLogs :: Bool
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [Text]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
@@ -72,7 +70,6 @@ defaultUciData = UCIData
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
     , _uciEngineLines = 1
-    , _uciMakeLogs = False
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
@@ -97,7 +94,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
     path = unpack _uciEnginePath
     reportError = raiseEvent . EventReportError
     logChan = fromJust _uciEngineLogChan
-    logsEnabled = _uciMakeLogs && (isJust _uciEngineLogChan)
+    logsEnabled = isJust _uciEngineLogChan
     uciTalk (Just hin, Just hout, Just herr, processHandle) = do
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar

@@ -28,6 +28,7 @@ module Model.AppModel
     , aiData
     , uciData
     , uciLogs
+    , uciRecordLogs
     , initModel
     , isWhiteTurn
     , getPathOrColor
@@ -70,6 +71,7 @@ data AppModel = AppModel
     , _amAiData :: AIData
     , _amUciData :: UCIData
     , _amUciLogs :: Text
+    , _amUciRecordLogs :: Bool
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -96,6 +98,7 @@ initModel = AppModel
     , _amAiData = initAI
     , _amUciData = defaultUciData
     , _amUciLogs = ""
+    , _amUciRecordLogs = False
     } where
         (startState, startStateReversed) = getBoardStates startpos
 

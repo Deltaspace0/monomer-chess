@@ -264,9 +264,11 @@ buildUI _ model@(AppModel{..}) = tree where
                 , button "Halt engine" $ AppSendEngineRequest "eof"
                 ]
         , separatorLine
-        , labeledCheckbox' "Record UCI logs" $ uciData . makeLogs
-        , widgetIf _uciMakeLogs $ textArea_ uciLogs [readOnly] `styleBasic`
-            [sizeReqH $ fixedSize 128]
+        , labeledCheckbox_ "Record UCI logs to file" uciRecordLogs
+            [ textRight
+            , onChange AppRecordUCILogsChanged
+            ]
+        , textArea_ uciLogs [readOnly] `styleBasic` [sizeReqH $ fixedSize 128]
         , separatorLine
         , hgrid'
             [ label $ "Engine depth: " <> (showt _uciEngineDepth)
