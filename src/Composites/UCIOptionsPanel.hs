@@ -52,7 +52,7 @@ buildUI _ UCIOptions{..} = tree where
     tree = vstack_ [childSpacing_ 16] optionWidgets
     optionWidgets = zipWith makeWidgetWithApplyButton [0..] _uoNextUciOptions
     makeWidgetWithApplyButton i opt = hstack_ [childSpacing_ 16]
-        [ applyButton i
+        [ applyButton i `styleBasic` [sizeReqH $ fixedSize 24]
         , makeWidget i opt
         ]
     makeWidget i (SpinUCI caption value minVal maxVal) = hgrid'
