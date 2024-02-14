@@ -40,8 +40,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 , vscroll $ vstack' $ label <$> _uciPrincipalVariations
                 , filler
                 ]
-            , widgetIf _amShowPromotionMenu $
-                alert (AppSetPromotionMenu False) promotionMenu
+            , widgetIf _amShowPromotionMenu promAlert
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
         , dropRemoveCont $ vstack'
@@ -52,6 +51,7 @@ buildUI _ model@(AppModel{..}) = tree where
         , separatorLine
         , zstack
             [ rightPanel
+            , widgetIf (_amShowPromotionMenu && _amShowTwoBoards) promAlert
             , widgetIf (not $ null _amErrorMessage) $
                 alertMsg (fromMaybe "" _amErrorMessage) $
                     AppSetErrorMessage Nothing
@@ -175,7 +175,7 @@ buildUI _ model@(AppModel{..}) = tree where
             `nodeEnabled` not calculatingResponse
         , toggleButton "Two boards" showTwoBoards
         ]
-    promotionMenu = vstack'
+    promAlert = alert (AppSetPromotionMenu False) $ vstack'
         [ label "Promote to:"
         , checkerboard 2 2 promotionPieces `styleBasic`
             [ sizeReqW $ fixedSize 100
