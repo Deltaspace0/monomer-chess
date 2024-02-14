@@ -34,7 +34,6 @@ module Model.AppModel
     , getPathOrColor
     , validateMove
     , getPromotedPly
-    , getPly
     , chessPieces
     ) where
 
@@ -122,22 +121,16 @@ getPathOrColor AppModel{..} (color, pieceType) = result where
             else "K"
     check = inCheck color _amChessPosition
 
-validateMove :: AppModel -> Bool -> ([[Piece]], Int, Int) -> Bool
-validateMove model@(AppModel{..}) r info = valid where
-    valid = getPromotedPly model r info Queen `elem` legal
+validateMove :: AppModel -> ([[Piece]], Int, Int) -> Bool
+validateMove model@(AppModel{..}) info@(_, ixTo, ixFrom) = valid where
+    valid = abs (ixTo-ixFrom) < 100 && promotedPly `elem` legal
+    promotedPly = getPromotedPly model info Queen
     legal = legalPlies _amChessPosition
 
-getPromotedPly
-    :: AppModel
-    -> Bool
-    -> ([[Piece]], Int, Int)
-    -> PieceType
-    -> Ply
-getPromotedPly model r info = promotePly model $ getPly r info
-
-getPly :: Bool -> ([[Piece]], Int, Int) -> Ply
-getPly r (_, ixTo, ixFrom) = move (f ixFrom) (f ixTo) where
-    f = getSquare r
+getPromotedPly :: AppModel -> ([[Piece]], Int, Int) -> PieceType -> Ply
+getPromotedPly model (_, ixTo, ixFrom) = promotePly model $ if ixTo >= 500
+    then move (squares!!(563-ixFrom)) (squares!!(563-ixTo))
+    else move (squares!!ixFrom) (squares!!ixTo)
 
 promotePly :: AppModel -> Ply -> PieceType -> Ply
 promotePly AppModel{..} ply pieceType = newPly where

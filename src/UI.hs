@@ -205,21 +205,24 @@ buildUI _ model@(AppModel{..}) = tree where
         else (gameBoard, gameBoardR)
     gameBoard = dragboard_ 8 8 boardState checkerPath
         [ checkerConfig [lightColor gray]
-        , moveValidator $ validateMove model False
-        , onChange $ AppBoardChanged False
+        , moveValidator $ validateMove model
+        , onChange AppBoardChanged
         ]
     gameBoardR = dragboard_ 8 8 boardStateReversed checkerPath
         [ checkerConfig [lightColor gray]
-        , moveValidator $ validateMove model True
-        , onChange $ AppBoardChanged True
+        , moveValidator $ validateMove model
+        , dragIdOffset 500
+        , onChange AppBoardChanged
         ]
     editBoard = dragboard_ 8 8 (fenData . fenBoardState) checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]
-        , onChange $ AppEditBoardChanged False
+        , dragIdOffset 2000
+        , onChange AppEditBoardChanged
         ]
     editBoardR = dragboard_ 8 8 (fenData . fenBoardStateReversed) checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]
-        , onChange $ AppEditBoardChanged True
+        , dragIdOffset 3000
+        , onChange AppEditBoardChanged
         ]
     extraBoard = dragboardD_ 6 2 pieceWidgetData checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]

@@ -27,8 +27,8 @@ data AppEvent
     = AppInit
     | AppSetPosition Position
     | AppSyncBoard
-    | AppBoardChanged Bool ([[Piece]], Int, Int)
-    | AppEditBoardChanged Bool ([[Piece]], Int, Int)
+    | AppBoardChanged ([[Piece]], Int, Int)
+    | AppEditBoardChanged ([[Piece]], Int, Int)
     | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
@@ -68,8 +68,8 @@ handleEvent _ _ model event = case event of
     AppInit -> initHandle model
     AppSetPosition v -> setPositionHandle v model
     AppSyncBoard -> syncBoardHandle model
-    AppBoardChanged r info -> boardChangedHandle r info model
-    AppEditBoardChanged r info -> editBoardChangedHandle r info model
+    AppBoardChanged info -> boardChangedHandle info model
+    AppEditBoardChanged info -> editBoardChangedHandle info model
     AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
@@ -146,9 +146,9 @@ syncBoardHandle model@(AppModel{..}) = response where
         ]
     (newState, newStateReversed) = getBoardStates _amChessPosition
 
-boardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
-boardChangedHandle r info model@(AppModel{..})
-    | isJust _amResponseThread = [Event AppSyncBoard]
+boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
+boardChangedHandle info@(_, ixTo, ixFrom) model@(AppModel{..})
+    | isJust _amResponseThread || differentBoards = [Event AppSyncBoard]
     | _amAutoQueen =
         [ setNextPly
         , Event AppRunNextPly
@@ -163,27 +163,36 @@ boardChangedHandle r info model@(AppModel{..})
             Event AppPlayNextResponse
         ]
     where
+        differentBoards = abs (ixTo-ixFrom) > 100
         setNextPly = Model $ model & nextPly .~ Just ply
-        ply = getPromotedPly model r info Queen
+        ply = getPromotedPly model info Queen
         noPromotion = null $ plyPromotion ply
 
-editBoardChangedHandle :: Bool -> ([[Piece]], Int, Int) -> EventHandle
-editBoardChangedHandle r (_, ixTo, ixFrom) model = response where
-    response =
-        [ responseIf (ixFrom >= 1000) $ Model newModel
-        , Model $ if r
-            then interModel & fenData . fenBoardState .~
-                reverse (interModel ^. fenData . fenBoardStateReversed)
-            else interModel & fenData . fenBoardStateReversed .~
-                reverse (interModel ^. fenData . fenBoardState)
-        , Event AppUpdateFEN
-        ]
-    newModel = if r
-        then model & fenData . fenBoardStateReversed . element ixTo .~ piece
-        else model & fenData . fenBoardState . element ixTo .~ piece
-    interModel = if ixFrom >= 1000
-        then newModel
+editBoardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
+editBoardChangedHandle (_, ixTo, ixFrom) model = response where
+    response
+        | ixTo >= 3000 && ixFrom >= 3000 =
+            [ Model $ model & fenData . fenBoardState .~ reversedStateRev
+            , Event AppUpdateFEN
+            ]
+        | ixTo >= 2000 && ixFrom >= 2000 =
+            [ Model $ model & fenData . fenBoardStateReversed .~ stateRev
+            , Event AppUpdateFEN
+            ]
+        | ixFrom >= 1000 =
+            [ Model modelFromExtraBoard
+            , Event AppUpdateFEN
+            ]
+        | otherwise = []
+    reversedStateRev = reverse $ model ^. fenData . fenBoardStateReversed
+    stateRev = reverse $ model ^. fenData . fenBoardState
+    modelFromExtraBoard = if ixTo >= 3000
+        then model
+            & fenData . fenBoardStateReversed . element (ixTo-3000) .~ piece
+            & fenData . fenBoardState . element (3063-ixTo) .~ piece
         else model
+            & fenData . fenBoardState . element (ixTo-2000) .~ piece
+            & fenData . fenBoardStateReversed . element (2063-ixTo) .~ piece
     piece = chessPieces!!(ixFrom-1000)
 
 setEditMenuHandle :: Bool -> EventHandle
