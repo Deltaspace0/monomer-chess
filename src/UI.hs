@@ -21,7 +21,7 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _ model@(AppModel{..}) = tree where
     tree = keystroke keyShortcuts $ hstack'
         [ zstack
-            [ vstack'
+            [ vstack' $ dropRemoveCont <$>
                 [ box' $ chessBoardLeft `styleBasic`
                     [ sizeReqW $ fixedSize 400
                     , sizeReqH $ fixedSize 400
@@ -38,12 +38,13 @@ buildUI _ model@(AppModel{..}) = tree where
                         ]
                 , separatorLine
                 , vscroll $ vstack' $ label <$> _uciPrincipalVariations
+                , filler
                 ]
             , widgetIf _amShowPromotionMenu $
                 alert (AppSetPromotionMenu False) promotionMenu
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
-        , vstack'
+        , dropRemoveCont $ vstack'
             [ moveHistoryButtons
             , separatorLine
             , moveHistoryPanel
@@ -56,6 +57,7 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ]
         ] `styleBasic` [padding 16]
+    dropRemoveCont = dropTarget AppEditBoardRemove
     keyShortcuts = zipWith (,) ["Up", "Left", "Right", "Down"] plyEvents
     moveHistoryButtons = hgrid' $ zipWith ($)
         [ flip nodeEnabled notFirstPosition . button "<<"
@@ -96,7 +98,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 then (i*2+1, i*2+2)
                 else (i*2, i*2+1)
     firstMoveColor = let _ :|> (p, _, _, _) = _amPreviousPositions in color p
-    rightPanel = vstack' $ if _amShowTwoBoards
+    rightPanel = vstack' $ dropRemoveCont <$> if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`
                 [ sizeReqW $ fixedSize 400
@@ -104,6 +106,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 ]
             , separatorLine
             , buttonPanel
+            , filler
             ]
         else
             [ hstack'
@@ -119,6 +122,7 @@ buildUI _ model@(AppModel{..}) = tree where
             , if _amShowEditMenu
                 then editControlPanel
                 else gameControlPanel
+            , filler
             ]
     editControlPanel = vstack'
         [ buttonPanel

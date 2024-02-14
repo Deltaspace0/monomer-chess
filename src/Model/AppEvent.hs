@@ -17,6 +17,7 @@ import Data.Text (pack, unpack, Text)
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
+import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
 import TextShow
 import qualified Data.Sequence as Seq
@@ -29,6 +30,7 @@ data AppEvent
     | AppSyncBoard
     | AppBoardChanged ([[Piece]], Int, Int)
     | AppEditBoardChanged ([[Piece]], Int, Int)
+    | AppEditBoardRemove DragId
     | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
@@ -70,6 +72,7 @@ handleEvent _ _ model event = case event of
     AppSyncBoard -> syncBoardHandle model
     AppBoardChanged info -> boardChangedHandle info model
     AppEditBoardChanged info -> editBoardChangedHandle info model
+    AppEditBoardRemove v -> editBoardRemoveHandle v model
     AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
@@ -184,16 +187,32 @@ editBoardChangedHandle (_, ixTo, ixFrom) model = response where
             , Event AppUpdateFEN
             ]
         | otherwise = []
-    reversedStateRev = reverse $ model ^. fenData . fenBoardStateReversed
     stateRev = reverse $ model ^. fenData . fenBoardState
+    reversedStateRev = reverse $ model ^. fenData . fenBoardStateReversed
     modelFromExtraBoard = if ixTo >= 3000
         then model
-            & fenData . fenBoardStateReversed . element (ixTo-3000) .~ piece
             & fenData . fenBoardState . element (3063-ixTo) .~ piece
+            & fenData . fenBoardStateReversed . element (ixTo-3000) .~ piece
         else model
             & fenData . fenBoardState . element (ixTo-2000) .~ piece
             & fenData . fenBoardStateReversed . element (2063-ixTo) .~ piece
     piece = chessPieces!!(ixFrom-1000)
+
+editBoardRemoveHandle :: DragId -> EventHandle
+editBoardRemoveHandle (DragId ixFrom) model = response where
+    response = if ixFrom < 2000
+        then []
+        else
+            [ Model newModel
+            , Event AppUpdateFEN
+            ]
+    newModel = if ixFrom >= 3000
+        then model
+            & fenData . fenBoardState . element (3063-ixFrom) .~ []
+            & fenData . fenBoardStateReversed . element (ixFrom-3000) .~ []
+        else model
+            & fenData . fenBoardState . element (ixFrom-2000) .~ []
+            & fenData . fenBoardStateReversed . element (2063-ixFrom) .~ []
 
 setEditMenuHandle :: Bool -> EventHandle
 setEditMenuHandle v model =

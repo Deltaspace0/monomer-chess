@@ -46,7 +46,7 @@ extra-deps:
   commit: 1e505384841dd8228b95c47e4c3ea5a52d015e79
 - nanovg-0.8.1.0
 - git: https://github.com/Deltaspace0/monomer-widgets.git
-  commit: c6975a711da2b66715410b0f58011a0e8f566520
+  commit: 9fc6dcaf0a90e577cad6b9aad7db0dfe4a4e508f
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
