@@ -23,7 +23,7 @@ buildUI :: UIBuilder AIData ()
 buildUI _ AIData{..} = tree where
     tree = vstack_ [childSpacing_ 16]
         [ hstack_ [childSpacing_ 16]
-            [ label "How to calculate:"
+            [ label "How to respond:"
             , textDropdownS responseMethod
                 [ RandomResponse
                 , UCIResponse
