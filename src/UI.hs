@@ -37,7 +37,7 @@ buildUI _ model@(AppModel{..}) = tree where
                             ]
                         ]
                 , separatorLine
-                , vscroll $ vstack' $ label <$> _uciPrincipalVariations
+                , vscroll $ vstack' $ labelPV <$> _uciPrincipalVariations
                 , filler
                 ]
             , widgetIf _amShowPromotionMenu promAlert
@@ -60,6 +60,7 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ]
         ] `styleBasic` [padding 16]
+    labelPV (caption, ply) = box_ [onClick $ AppDoPly ply] $ label caption
     dropRemoveCont = dropTarget AppEditBoardRemove
     keyShortcuts = zipWith (,) ["Up", "Left", "Right", "Down"] plyEvents
     moveHistoryPanel = vstack'

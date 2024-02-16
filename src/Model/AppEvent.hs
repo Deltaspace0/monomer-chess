@@ -52,7 +52,7 @@ data AppEvent
     | AppSetRequestMVars (Maybe (MVar String, MVar Position))
     | AppSetEngineLogChan (Maybe (Chan String))
     | AppSetCurrentEngineDepth (Maybe Text)
-    | AppSetPrincipalVariations [Text]
+    | AppSetPrincipalVariations [(Text, Maybe Ply)]
     | AppSetOptionsUCI UCIOptions
     | AppRunAnalysis
     | AppSendEngineRequest String
@@ -408,7 +408,7 @@ setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
 setCurrentEngineDepthHandle v model = response where
     response = [Model $ model & uciData . currentEngineDepth .~ v]
 
-setPrincipalVariationsHandle :: [Text] -> EventHandle
+setPrincipalVariationsHandle :: [(Text, Maybe Ply)] -> EventHandle
 setPrincipalVariationsHandle v model = response where
     response = [Model $ model & uciData . principalVariations .~ v]
 

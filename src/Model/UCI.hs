@@ -45,7 +45,7 @@ data UCIEvent
     | EventSetEngineLoading Bool
     | EventSetRequestMVars (Maybe (MVar String, MVar Position))
     | EventSetCurrentDepth (Maybe Text)
-    | EventSetPV [Text]
+    | EventSetPV [(Text, Maybe Ply)]
     | EventSetOptionsUCI UCIOptions
     deriving (Eq, Show)
 
@@ -54,7 +54,7 @@ data UCIData = UCIData
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
     , _uciCurrentEngineDepth :: Maybe Text
-    , _uciPrincipalVariations :: [Text]
+    , _uciPrincipalVariations :: [(Text, Maybe Ply)]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
     , _uciEngineLogChan :: Maybe (Chan String)
     , _uciOptionsUCI :: UCIOptions
@@ -202,12 +202,16 @@ getUciDepth uciOutput depth = newDepth where
         else depth
     ws = words uciOutput
 
-getNewPrincipalVariations :: Position -> String -> [Text] -> [Text]
+getNewPrincipalVariations
+    :: Position
+    -> String
+    -> [(Text, Maybe Ply)]
+    -> [(Text, Maybe Ply)]
 getNewPrincipalVariations position uciOutput variations = newVariations where
     newVariations = if "pv" `elem` ws
-        then (variations <> emptyLines) & ix (j-1) .~ uciInfo
+        then (variations <> emptyLines) & ix (j-1) .~ (uciInfo, firstPly)
         else variations
-    emptyLines = take (j-length variations) $ repeat "..."
+    emptyLines = replicate (j-length variations) ("...", Nothing)
     j = if "multipv" `elem` ws
         then read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
         else 1
@@ -247,6 +251,7 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
     uciMoves = drop (fromJust (elemIndex "pv" ws) + 1) ws
     si = fromJust $ elemIndex "score" ws
     ws = words uciOutput
+    firstPly = listToMaybe uciMoves >>= fromUCI position
 
 uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
 uciRequestAnalysis UCIData{..} initPos pos uciMoves = do
