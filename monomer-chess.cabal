@@ -28,6 +28,7 @@ library
       Composites
       Composites.AIPanel
       Composites.FlagPanel
+      Composites.TablebasePanel
       Composites.ThinkButton
       Composites.UCIOptionsPanel
       Model
@@ -38,6 +39,7 @@ library
       Model.AppEvent
       Model.AppModel
       Model.FENData
+      Model.Tablebase
       Model.UCI
       Model.UCIOptions
       UI
@@ -49,11 +51,13 @@ library
       OverloadedStrings
   ghc-options: -Wall -Wno-orphans -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , chessIO
     , containers
     , deepseq
     , directory
+    , http-client
     , lens
     , monomer
     , monomer-widgets
@@ -62,6 +66,7 @@ library
     , split
     , text
     , text-show
+    , wreq
   default-language: Haskell2010
 
 executable monomer-chess-exe
@@ -74,11 +79,13 @@ executable monomer-chess-exe
       OverloadedStrings
   ghc-options: -Wall -Wno-orphans -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , chessIO
     , containers
     , deepseq
     , directory
+    , http-client
     , lens
     , monomer
     , monomer-chess
@@ -88,6 +95,7 @@ executable monomer-chess-exe
     , split
     , text
     , text-show
+    , wreq
   default-language: Haskell2010
 
 test-suite monomer-chess-test
@@ -101,11 +109,13 @@ test-suite monomer-chess-test
       OverloadedStrings
   ghc-options: -Wall -Wno-orphans -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
     , chessIO
     , containers
     , deepseq
     , directory
+    , http-client
     , lens
     , monomer
     , monomer-chess
@@ -115,4 +125,5 @@ test-suite monomer-chess-test
     , split
     , text
     , text-show
+    , wreq
   default-language: Haskell2010

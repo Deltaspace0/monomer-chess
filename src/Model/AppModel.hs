@@ -6,6 +6,7 @@
 module Model.AppModel
     ( module Model.AI
     , module Model.FENData
+    , module Model.Tablebase
     , module Model.UCI
     , AppModel(..)
     , boardState
@@ -17,6 +18,8 @@ module Model.AppModel
     , showTwoBoards
     , showEditMenu
     , showPromotionMenu
+    , showTablebase
+    , tablebaseData
     , errorMessage
     , autoQueen
     , boardRotated
@@ -47,6 +50,7 @@ import qualified Monomer as M
 
 import Model.AI
 import Model.FENData
+import Model.Tablebase
 import Model.UCI
 
 data AppModel = AppModel
@@ -59,6 +63,8 @@ data AppModel = AppModel
     , _amShowTwoBoards :: Bool
     , _amShowEditMenu :: Bool
     , _amShowPromotionMenu :: Bool
+    , _amShowTablebase :: Bool
+    , _amTablebaseData :: TablebaseData
     , _amErrorMessage :: Maybe Text
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
@@ -86,6 +92,8 @@ initModel = AppModel
     , _amShowTwoBoards = False
     , _amShowEditMenu = False
     , _amShowPromotionMenu = False
+    , _amShowTablebase = False
+    , _amTablebaseData = defaultTablebaseData
     , _amErrorMessage = Nothing
     , _amAutoQueen = False
     , _amBoardRotated = False

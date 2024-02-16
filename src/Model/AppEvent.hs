@@ -34,6 +34,7 @@ data AppEvent
     | AppSetEditMenu Bool
     | AppSetPromotionMenu Bool
     | AppSetErrorMessage (Maybe Text)
+    | AppDoPly (Maybe Ply)
     | AppRunNextPly
     | AppPromote PieceType
     | AppPlayNextResponse
@@ -58,6 +59,7 @@ data AppEvent
     | AppSetUciLogs Text
     | AppClearUciLogs
     | AppRecordUCILogsChanged Bool
+    | AppSetTablebaseData TablebaseData
     deriving (Eq, Show)
 
 instance NFData Ply where
@@ -76,6 +78,7 @@ handleEvent _ _ model event = case event of
     AppSetEditMenu v -> setEditMenuHandle v model
     AppSetPromotionMenu v -> setPromotionMenuHandle v model
     AppSetErrorMessage v -> setErrorMessageHandle v model
+    AppDoPly v -> doPlyHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
     AppPlayNextResponse -> playNextResponseHandle model
@@ -100,6 +103,7 @@ handleEvent _ _ model event = case event of
     AppSetUciLogs v -> setUciLogsHandle v model
     AppClearUciLogs -> clearUciLogsHandle model
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
+    AppSetTablebaseData v -> setTablebaseDataHandle v model
 
 initHandle :: EventHandle
 initHandle _ = [Producer producerHandler] where
@@ -233,6 +237,12 @@ setErrorMessageHandle v model =
     [ Model $ model
         & showPromotionMenu .~ False
         & errorMessage .~ v
+    ]
+
+doPlyHandle :: Maybe Ply -> EventHandle
+doPlyHandle ply model =
+    [ Model $ model & nextPly .~ ply
+    , Event AppRunNextPly
     ]
 
 runNextPlyHandle :: EventHandle
@@ -406,8 +416,20 @@ setOptionsUCIHandle :: UCIOptions -> EventHandle
 setOptionsUCIHandle v model = [Model $ model & uciData . optionsUCI .~ v]
 
 runAnalysisHandle :: EventHandle
-runAnalysisHandle AppModel{..} = [Producer producerHandler] where
-    producerHandler _ = uciRequestAnalysis _amUciData initPos pos uciMoves
+runAnalysisHandle model@(AppModel{..}) = response where
+    response =
+        [ if _amShowTablebase
+            then Producer tablebaseHandler
+            else Model $ model & tablebaseData .~ defaultTablebaseData
+        , Producer uciHandler
+        ]
+    tablebaseHandler raiseEvent = do
+        raiseEvent $ AppSetTablebaseData $ _amTablebaseData
+            { _tbdStatusMessage = Just "Querying..."
+            }
+        newTablebaseData <- tablebaseRequestAnalysis pos
+        raiseEvent $ AppSetTablebaseData newTablebaseData
+    uciHandler _ = uciRequestAnalysis _amUciData initPos pos uciMoves
     _ :|> (initPos, _, _, _) = _amPreviousPositions
     (pos, _, uciMoves, _) = fromJust $ Seq.lookup i _amPreviousPositions
     i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
@@ -436,3 +458,6 @@ recordUCILogsChangedHandle v AppModel{..} = [Producer producerHandler] where
     producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
     msg = "monomer-record-uci-" <> (show v)
     UCIData{..} = _amUciData
+
+setTablebaseDataHandle :: TablebaseData -> EventHandle
+setTablebaseDataHandle v model = [Model $ model & tablebaseData .~ v]

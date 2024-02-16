@@ -20,11 +20,13 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/Deltaspace0/monomer-chess#readme>
 
 dependencies:
+- aeson
 - base >= 4.7 && < 5
 - chessIO
 - containers
 - deepseq
 - directory
+- http-client
 - lens
 - monomer
 - monomer-widgets
@@ -33,6 +35,7 @@ dependencies:
 - split
 - text
 - text-show
+- wreq
 
 default-extensions:
 - OverloadedStrings

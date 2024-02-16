@@ -44,10 +44,13 @@ buildUI _ model@(AppModel{..}) = tree where
             ] `styleBasic` [sizeReqW $ fixedSize 400]
         , separatorLine
         , dropRemoveCont $ vstack'
-            [ moveHistoryButtons
+            [ if _amShowTablebase
+                then tablebasePanel tablebaseData AppDoPly
+                else moveHistoryPanel
+            , filler
             , separatorLine
-            , moveHistoryPanel
-            ]
+            , toggleButton "Tablebase" showTablebase
+            ] `styleBasic` [sizeReqW $ fixedSize 204]
         , separatorLine
         , zstack
             [ rightPanel
@@ -59,6 +62,11 @@ buildUI _ model@(AppModel{..}) = tree where
         ] `styleBasic` [padding 16]
     dropRemoveCont = dropTarget AppEditBoardRemove
     keyShortcuts = zipWith (,) ["Up", "Left", "Right", "Down"] plyEvents
+    moveHistoryPanel = vstack'
+        [ moveHistoryButtons
+        , separatorLine
+        , vscroll $ vstack_ [childSpacing_ 4] moveLines
+        ]
     moveHistoryButtons = hgrid' $ zipWith ($)
         [ flip nodeEnabled notFirstPosition . button "<<"
         , flip nodeEnabled notFirstPosition . button "<"
@@ -73,8 +81,6 @@ buildUI _ model@(AppModel{..}) = tree where
         ]
     notFirstPosition = _amCurrentPlyNumber > 0
     notLastPosition = _amCurrentPlyNumber < Seq.length _amPreviousPositions-1
-    moveHistoryPanel = vscroll (vstack_ [childSpacing_ 4] moveLines)
-        `styleBasic` [sizeReqW $ fixedSize 204]
     moveLines = makeHistoryLine <$> if firstMoveColor == White
         then [0..(Seq.length _amPreviousPositions) `div` 2 - 1]
         else [0..(Seq.length _amPreviousPositions + 1) `div` 2 - 1]
@@ -169,6 +175,7 @@ buildUI _ model@(AppModel{..}) = tree where
                     , button "Undo move" AppUndoMove
                         `nodeEnabled` (length _amPreviousPositions >= 2)
                     ]
+            , button "Refresh analysis" AppRunAnalysis
             ]
     resetTwoBoardsButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
