@@ -22,6 +22,7 @@ module Model.UCI
     , uciRequestAnalysis
     ) where
 
+import Control.Applicative
 import Control.Concurrent
 import Control.Lens
 import Control.Exception
@@ -196,10 +197,8 @@ reorderUciOpts opts = commonOpts <> otherOpts where
         _ -> Right x
 
 getUciDepth :: String -> Maybe Text -> Maybe Text
-getUciDepth uciOutput depth = newDepth where
-    newDepth = if "depth" `elem` ws
-        then Just $ pack $ ws!!(fromJust (elemIndex "depth" ws) + 1)
-        else depth
+getUciDepth uciOutput depth = newDepth <|> depth where
+    newDepth = (pack . (ws!!) . succ) <$> elemIndex "depth" ws
     ws = words uciOutput
 
 getNewPrincipalVariations
