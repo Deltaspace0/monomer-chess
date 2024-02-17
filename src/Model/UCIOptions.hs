@@ -159,10 +159,7 @@ optionNameFromUci optionString = do
     return $ unwords $ takeWhile (/= "type") $ drop (i+1) ws
 
 stringParameterFromUci :: String -> String -> Maybe String
-stringParameterFromUci optionString param = result where
-    result = if null params
-        then Nothing
-        else Just $ head params
+stringParameterFromUci optionString param = listToMaybe params where
     params = getParametersFromUci optionString param
 
 intParameterFromUci :: String -> String -> Maybe Int

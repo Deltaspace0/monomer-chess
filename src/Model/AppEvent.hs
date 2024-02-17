@@ -368,8 +368,8 @@ applyEditChangesHandle model =
 clearEditBoardHandle :: EventHandle
 clearEditBoardHandle model =
     [ Model $ model
-        & fenData . fenBoardState .~ take 64 (repeat [])
-        & fenData . fenBoardStateReversed .~ take 64 (repeat [])
+        & fenData . fenBoardState .~ replicate 64 []
+        & fenData . fenBoardStateReversed .~ replicate 64 []
         & fenData . fenCastleWK .~ False
         & fenData . fenCastleWQ .~ False
         & fenData . fenCastleBK .~ False
