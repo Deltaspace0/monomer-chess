@@ -10,6 +10,8 @@ module Model.UCI
     , enginePath
     , engineLoading
     , engineDepth
+    , engineNodes
+    , engineDepthOrNodes
     , currentEngineDepth
     , principalVariations
     , requestMVars
@@ -55,6 +57,8 @@ data UCIData = UCIData
     { _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
+    , _uciEngineNodes :: Int
+    , _uciEngineDepthOrNodes :: Bool
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [(Text, Maybe Ply)]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
@@ -75,6 +79,8 @@ defaultUciData = UCIData
     { _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
+    , _uciEngineNodes = 500000
+    , _uciEngineDepthOrNodes = True
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
@@ -262,7 +268,9 @@ uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
 uciRequestAnalysis UCIData{..} initPos pos uciMoves = do
     let (rvar, pvar) = fromJust _uciRequestMVars
         posReq = "position fen " <> (toFEN initPos) <> " moves" <> uciMoves
-        goReq = "go depth " <> (show _uciEngineDepth)
+        goReq = if _uciEngineDepthOrNodes
+            then "go depth " <> (show _uciEngineDepth)
+            else "go nodes " <> (show _uciEngineNodes)
     unless (null _uciRequestMVars) $ do
         _ <- tryTakeMVar pvar
         putMVar pvar pos

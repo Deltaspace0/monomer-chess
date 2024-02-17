@@ -290,8 +290,14 @@ buildUI _ model@(AppModel{..}) = tree where
         , textArea_ uciLogs [readOnly] `styleBasic` [sizeReqH $ fixedSize 128]
         , separatorLine
         , hgrid'
-            [ label $ "Engine depth: " <> (showt _uciEngineDepth)
+            [ labeledRadio_ ("Engine depth: " <> (showt _uciEngineDepth))
+                True (uciData . engineDepthOrNodes) [textRight]
             , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]
+            ]
+        , hgrid'
+            [ labeledRadio_ "Engine nodes:" False
+                (uciData . engineDepthOrNodes) [textRight]
+            , numericField $ uciData . engineNodes
             ]
         , separatorLine
         , label "UCI options"
