@@ -41,6 +41,5 @@ buildUI _ AIData{..} = tree where
                 [ label $ "MCTS runs: " <> (showt _adMctsRuns)
                 , hslider_ mctsRuns 100 30000 [dragRate 1]
                 ]
-        , widgetIf (not $ null _adPositionEvaluation) $
-            label $ "Evaluation: " <> fromMaybe "" _adPositionEvaluation
+        , widgetIf (isJust _adAiMessage) $ label $ fromMaybe "" _adAiMessage
         ]

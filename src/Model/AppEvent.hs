@@ -37,6 +37,8 @@ data AppEvent
     | AppDoPly (Maybe Ply)
     | AppRunNextPly
     | AppPromote PieceType
+    | AppSetUciBestMoveMVar (Maybe (MVar String, MVar ()))
+    | AppSetResetUciBestMove Bool
     | AppPlayNextResponse
     | AppAbortNextResponse
     | AppResponseCalculated (Maybe Ply, Maybe Text)
@@ -81,6 +83,8 @@ handleEvent _ _ model event = case event of
     AppDoPly v -> doPlyHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
+    AppSetUciBestMoveMVar v -> setUciBestMoveMVarHandle v model
+    AppSetResetUciBestMove v -> setResetUciBestMoveHandle v model
     AppPlayNextResponse -> playNextResponseHandle model
     AppAbortNextResponse -> abortNextResponseHandle model
     AppResponseCalculated v -> responseCalculatedHandle v model
@@ -110,7 +114,10 @@ initHandle _ = [Producer producerHandler] where
     producerHandler raiseEvent = do
         createDirectoryIfMissing True "logs_uci"
         logChan <- newChan
+        bestMoveVar <- newEmptyMVar
+        bestSyncVar <- newEmptyMVar
         raiseEvent $ AppSetEngineLogChan $ Just logChan
+        raiseEvent $ AppSetUciBestMoveMVar $ Just (bestMoveVar, bestSyncVar)
         logsListRef <- newIORef []
         logsRef <- newIORef ""
         recordRef <- newIORef False
@@ -124,6 +131,10 @@ initHandle _ = [Producer producerHandler] where
                 writeIORef logsListRef []
                 writeIORef logsRef ""
             _ -> do
+                let uciBestMove = getUciBestMove x
+                when (isJust uciBestMove) $ do
+                    _ <- tryTakeMVar bestMoveVar
+                    putMVar bestMoveVar $ fromJust uciBestMove
                 doRecord <- readIORef recordRef
                 when doRecord $ appendFile "logs_uci/outputs.txt" $ x <> "\n"
                 modifyIORef logsListRef $ take 32 . (x:)
@@ -138,7 +149,7 @@ setPositionHandle position model =
         & showPromotionMenu .~ False
         & sanMoves .~ ""
         & forsythEdwards .~ pack (toFEN position)
-        & aiData . positionEvaluation .~ Nothing
+        & aiData . aiMessage .~ Nothing
     , Event AppSyncBoard
     , Event AppRunAnalysis
     ]
@@ -284,10 +295,26 @@ promoteHandle pieceType model@(AppModel{..}) = response where
         , responseIf _amAutoRespond $ Event AppPlayNextResponse
         ]
 
+setUciBestMoveMVarHandle :: Maybe (MVar String, MVar ()) -> EventHandle
+setUciBestMoveMVarHandle v model = response where
+    response = [Model $ model & aiData . uciBestMoveMVar .~ v]
+
+setResetUciBestMoveHandle :: Bool -> EventHandle
+setResetUciBestMoveHandle v model = response where
+    response = [Model $ model & aiData . resetUciBestMove .~ v]
+
 playNextResponseHandle :: EventHandle
 playNextResponseHandle AppModel{..} = response where
     response = [Producer producerHandler]
     producerHandler raiseEvent = do
+        let (bestMoveVar, bestSyncVar) = fromJust _adUciBestMoveMVar
+        when (isJust _adUciBestMoveMVar) $ do
+            when _adResetUciBestMove $ do
+                takeMVar bestSyncVar
+                raiseEvent $ AppSetResetUciBestMove False
+            when (null _uciRequestMVars) $ do
+                _ <- tryTakeMVar bestMoveVar
+                putMVar bestMoveVar "nouci"
         mvar <- newEmptyMVar
         thread <- forkIO $ do
             result <- calculateMove _amChessPosition _amAiData
@@ -296,6 +323,8 @@ playNextResponseHandle AppModel{..} = response where
             putMVar mvar ()
         raiseEvent $ AppSetResponseThread $ Just thread
         takeMVar mvar
+    AIData{..} = _amAiData
+    UCIData{..} = _amUciData
 
 abortNextResponseHandle :: EventHandle
 abortNextResponseHandle model@(AppModel{..}) =
@@ -304,11 +333,11 @@ abortNextResponseHandle model@(AppModel{..}) =
     ]
 
 responseCalculatedHandle :: (Maybe Ply, Maybe Text) -> EventHandle
-responseCalculatedHandle (responsePly, posEval) model =
+responseCalculatedHandle (responsePly, message) model =
     [ Model $ model
         & nextPly .~ responsePly
         & responseThread .~ Nothing
-        & aiData . positionEvaluation .~ posEval
+        & aiData . aiMessage .~ message
     , Event AppRunNextPly
     ]
 
@@ -326,7 +355,7 @@ plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
                 & showPromotionMenu .~ False
                 & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN previousPosition)
-                & aiData . positionEvaluation .~ Nothing
+                & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
@@ -344,7 +373,7 @@ undoMoveHandle model@(AppModel{..}) = response where
             & showPromotionMenu .~ False
             & sanMoves .~ moves
             & forsythEdwards .~ pack (toFEN previousPosition)
-            & aiData . positionEvaluation .~ Nothing
+            & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
@@ -418,7 +447,8 @@ setOptionsUCIHandle v model = [Model $ model & uciData . optionsUCI .~ v]
 runAnalysisHandle :: EventHandle
 runAnalysisHandle model@(AppModel{..}) = response where
     response =
-        [ if _amShowTablebase
+        [ Model $ model & aiData . resetUciBestMove .~ True
+        , if _amShowTablebase
             then Producer tablebaseHandler
             else Model $ model & tablebaseData .~ defaultTablebaseData
         , Producer uciHandler
@@ -429,10 +459,17 @@ runAnalysisHandle model@(AppModel{..}) = response where
             }
         newTablebaseData <- tablebaseRequestAnalysis pos
         raiseEvent $ AppSetTablebaseData newTablebaseData
-    uciHandler _ = uciRequestAnalysis _amUciData initPos pos uciMoves
+    uciHandler _ = do
+        let (bestMoveVar, bestSyncVar) = fromJust _adUciBestMoveMVar
+        when (isJust _adUciBestMoveMVar) $ do
+            _ <- tryTakeMVar bestMoveVar
+            _ <- tryTakeMVar bestSyncVar
+            putMVar bestSyncVar ()
+        uciRequestAnalysis _amUciData initPos pos uciMoves
     _ :|> (initPos, _, _, _) = _amPreviousPositions
     (pos, _, uciMoves, _) = fromJust $ Seq.lookup i _amPreviousPositions
     i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
+    AIData{..} = _amAiData
 
 sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where

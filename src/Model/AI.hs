@@ -8,13 +8,16 @@ module Model.AI
     ( ResponseMethod(..)
     , AIData(..)
     , responseMethod
+    , uciBestMoveMVar
+    , resetUciBestMove
     , mctsRuns
     , minimaxDepth
-    , positionEvaluation
+    , aiMessage
     , initAI
     , calculateMove
     ) where
 
+import Control.Concurrent
 import Control.Lens
 import Data.Text (Text)
 import Game.Chess
@@ -39,28 +42,35 @@ instance Show ResponseMethod where
 
 data AIData = AIData
     { _adResponseMethod :: ResponseMethod
+    , _adUciBestMoveMVar :: Maybe (MVar String, MVar ())
+    , _adResetUciBestMove :: Bool
     , _adMctsRuns :: Int
     , _adMinimaxDepth :: Int
-    , _adPositionEvaluation :: Maybe Text
-    } deriving (Eq, Show)
+    , _adAiMessage :: Maybe Text
+    } deriving Eq
+
+instance Show AIData where
+    show _ = ""
 
 makeLensesWith abbreviatedFields 'AIData
 
 initAI :: AIData
 initAI = AIData
-    { _adResponseMethod = RandomResponse
+    { _adResponseMethod = UCIResponse
+    , _adUciBestMoveMVar = Nothing
+    , _adResetUciBestMove = False
     , _adMctsRuns = 2000
     , _adMinimaxDepth = 4
-    , _adPositionEvaluation = Nothing
+    , _adAiMessage = Nothing
     }
 
 calculateMove :: Position -> AIData -> IO (Maybe Ply, Maybe Text)
 calculateMove pos AIData{..} = result where
     result = case _adResponseMethod of
         RandomResponse -> onlyPly <$> randomMove pos
-        MinimaxResponse -> pure (mmPly, Just $ showt eval)
+        MinimaxResponse -> pure (mmPly, Just $ "Evaluation: " <> showt eval)
         MCTSResponse -> onlyPly <$> mctsMove pos _adMctsRuns
-        UCIResponse -> pure (Nothing, Nothing)
+        UCIResponse -> uciMove pos _adUciBestMoveMVar
     (mmPly, eval) = minimaxMove pos _adMinimaxDepth
     onlyPly x = (x, Nothing)
 
@@ -70,3 +80,17 @@ randomMove position = result where
         then pure Nothing
         else Just . (legal!!) <$> randomRIO (0, length legal-1)
     legal = legalPlies position
+
+uciMove
+    :: Position
+    -> Maybe (MVar String, MVar ())
+    -> IO (Maybe Ply, Maybe Text)
+uciMove position maybeVar = result where
+    result = maybe noMVarMessage (getBestMove . fst) maybeVar
+    noMVarMessage = return (Nothing, Just "MVar is not initialized")
+    getBestMove bestMoveVar = do
+        uciText <- takeMVar bestMoveVar
+        let ply = fromUCI position uciText
+        if null ply && (uciText /= "nouci")
+            then getBestMove bestMoveVar
+            else return (ply, Nothing)

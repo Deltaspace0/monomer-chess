@@ -18,6 +18,7 @@ module Model.UCI
     , defaultUciData
     , loadUciEngine
     , getUciDepth
+    , getUciBestMove
     , getNewPrincipalVariations
     , uciRequestAnalysis
     ) where
@@ -194,11 +195,16 @@ reorderUciOpts opts = commonOpts <> otherOpts where
             { _spuSpinMinValue = 1
             , _spuSpinMaxValue = 10
             }
+        SpinUCI "Skill Level" _ _ _ -> Left x
         _ -> Right x
 
 getUciDepth :: String -> Maybe Text -> Maybe Text
 getUciDepth uciOutput depth = newDepth <|> depth where
     newDepth = (pack . (ws!!) . succ) <$> elemIndex "depth" ws
+    ws = words uciOutput
+
+getUciBestMove :: String -> Maybe String
+getUciBestMove uciOutput = ((ws!!) . succ) <$> elemIndex "bestmove" ws where
     ws = words uciOutput
 
 getNewPrincipalVariations
