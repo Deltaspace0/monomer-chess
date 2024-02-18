@@ -266,7 +266,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
                 & positionTree .~ newPositionTree
-                & positionTreePath .~ cutOffPositionTreePath <> [0]
+                & positionTreePath .~ newPositionTreePath
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
@@ -276,7 +276,16 @@ runNextPlyHandle model@(AppModel{..}) = response where
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
-    newPositionTree = insertTree cutOffPositionTreePath pp _amPositionTree
+    newPositionTree = case insertResult of
+        Left _ -> _amPositionTree
+        Right tree -> tree
+    newPositionTreePath = case insertResult of
+        Left exi -> if exi == _amPositionTreePath!!_amCurrentPlyNumber
+            then _amPositionTreePath
+            else addTail $ cutOffPositionTreePath <> [exi]
+        Right _ -> cutOffPositionTreePath <> [0]
+    addTail p = p <> replicate (getTreeTailDepth p _amPositionTree) 0
+    insertResult = insertTree cutOffPositionTreePath pp _amPositionTree
     cutOffPositionTreePath = take _amCurrentPlyNumber _amPositionTreePath
     pp = (fromJust newPosition, newSanMoves, newUciMoves, san)
     newSanMoves = _amSanMoves <> numberText <> " " <> san

@@ -58,11 +58,13 @@ import Model.FENData
 import Model.Tablebase
 import Model.UCI
 
+type PP = (Position, Text, String, Text)
+
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPositionTree :: Tree (Position, Text, String, Text)
+    , _amPositionTree :: Tree PP
     , _amPositionTreePath :: [Int]
     , _amCurrentPlyNumber :: Int
     , _amNextPly :: Maybe Ply
@@ -119,7 +121,7 @@ initModel = AppModel
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn AppModel{..} = color _amChessPosition == White
 
-indexPositionTree :: AppModel -> Int -> (Position, Text, String, Text)
+indexPositionTree :: AppModel -> Int -> PP
 indexPositionTree AppModel{..} i = result where
     Node result _ = indexTree (take i _amPositionTreePath) _amPositionTree
 
@@ -127,10 +129,20 @@ indexTree :: [Int] -> Tree a -> Tree a
 indexTree [] tree = tree
 indexTree (x:xs) (Node _ childNodes) = indexTree xs $ childNodes!!x
 
-insertTree :: [Int] -> a -> Tree a -> Tree a
-insertTree [] pp (Node v childNodes) = Node v $ (Node pp []):childNodes
-insertTree (x:xs) pp (Node v childNodes) = Node v newChildNodes where
-    newChildNodes = childNodes & ix x %~ insertTree xs pp
+insertTree :: [Int] -> PP -> Tree PP -> Either Int (Tree PP)
+insertTree [] pp@(_, _, _, t) (Node v childNodes) = result where
+    result = if existingIndex == -1
+        then Right $ Node v $ (Node pp []):childNodes
+        else Left existingIndex
+    existingIndex = findExistingIndex childNodes 0
+    findExistingIndex [] _ = -1
+    findExistingIndex ((Node (_, _, _, t') _):xs) i = if t == t'
+        then i
+        else findExistingIndex xs $ i+1
+insertTree (x:xs) pp (Node v childNodes) = result where
+    result = case insertTree xs pp (childNodes!!x) of
+        Left existingIndex -> Left existingIndex
+        Right newTree -> Right $ Node v $ childNodes & ix x .~ newTree
 
 pruneTree :: [Int] -> Tree a -> Tree a
 pruneTree [] _ = error "empty prune path"
