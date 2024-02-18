@@ -13,7 +13,8 @@ module Model.AppModel
     , boardStateReversed
     , nextPly
     , chessPosition
-    , previousPositions
+    , positionTree
+    , positionTreePath
     , currentPlyNumber
     , showTwoBoards
     , showEditMenu
@@ -34,6 +35,11 @@ module Model.AppModel
     , uciRecordLogs
     , initModel
     , isWhiteTurn
+    , indexPositionTree
+    , indexTree
+    , insertTree
+    , pruneTree
+    , getTreeTailDepth
     , getPathOrColor
     , validateMove
     , getPromotedPly
@@ -44,8 +50,7 @@ import Control.Concurrent
 import Control.Lens
 import Game.Chess
 import Data.Text (pack, Text)
-import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Tree (Tree(..))
 import qualified Monomer as M
 
 import Model.AI
@@ -57,7 +62,8 @@ data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
-    , _amPreviousPositions :: Seq (Position, Text, String, Text)
+    , _amPositionTree :: Tree (Position, Text, String, Text)
+    , _amPositionTreePath :: [Int]
     , _amCurrentPlyNumber :: Int
     , _amNextPly :: Maybe Ply
     , _amShowTwoBoards :: Bool
@@ -86,7 +92,8 @@ initModel = AppModel
     { _amBoardState = startState
     , _amBoardStateReversed = startStateReversed
     , _amChessPosition = startpos
-    , _amPreviousPositions = Seq.singleton (startpos, "", "", "")
+    , _amPositionTree = Node (startpos, "", "", "") []
+    , _amPositionTreePath = []
     , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
     , _amShowTwoBoards = False
@@ -111,6 +118,30 @@ initModel = AppModel
 
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn AppModel{..} = color _amChessPosition == White
+
+indexPositionTree :: AppModel -> Int -> (Position, Text, String, Text)
+indexPositionTree AppModel{..} i = result where
+    Node result _ = indexTree (take i _amPositionTreePath) _amPositionTree
+
+indexTree :: [Int] -> Tree a -> Tree a
+indexTree [] tree = tree
+indexTree (x:xs) (Node _ childNodes) = indexTree xs $ childNodes!!x
+
+insertTree :: [Int] -> a -> Tree a -> Tree a
+insertTree [] pp (Node v childNodes) = Node v $ (Node pp []):childNodes
+insertTree (x:xs) pp (Node v childNodes) = Node v newChildNodes where
+    newChildNodes = childNodes & ix x %~ insertTree xs pp
+
+pruneTree :: [Int] -> Tree a -> Tree a
+pruneTree [] _ = error "empty prune path"
+pruneTree (x:xs) (Node v childNodes) = Node v $ if null xs
+    then take x childNodes <> drop (x+1) childNodes
+    else childNodes & ix x %~ pruneTree xs
+
+getTreeTailDepth :: [Int] -> Tree a -> Int
+getTreeTailDepth path tree = go $ indexTree path tree where
+    go (Node _ []) = 0
+    go (Node _ childNodes) = 1 + go (head childNodes)
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color
 getPathOrColor AppModel{..} (color, pieceType) = result where

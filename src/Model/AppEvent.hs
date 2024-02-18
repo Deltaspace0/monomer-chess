@@ -12,15 +12,14 @@ import Control.Lens
 import Control.Monad
 import Data.IORef
 import Data.Maybe
-import Data.Sequence (Seq(..))
 import Data.Text (pack, unpack, Text)
+import Data.Tree (Tree(..))
 import Game.Chess
 import Game.Chess.SAN
 import Monomer
 import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
 import TextShow
-import qualified Data.Sequence as Seq
 
 import Model.AppModel
 
@@ -44,6 +43,7 @@ data AppEvent
     | AppResponseCalculated (Maybe Ply, Maybe Text)
     | AppSetResponseThread (Maybe ThreadId)
     | AppPlyNumberChanged Int
+    | AppPositionTreePathChanged Int
     | AppUndoMove
     | AppLoadFEN
     | AppApplyEditChanges
@@ -90,6 +90,7 @@ handleEvent _ _ model event = case event of
     AppResponseCalculated v -> responseCalculatedHandle v model
     AppSetResponseThread v -> setResponseThreadHandle v model
     AppPlyNumberChanged v -> plyNumberChangedHandle v model
+    AppPositionTreePathChanged v -> positionTreePathChangedHandle v model
     AppUndoMove -> undoMoveHandle model
     AppLoadFEN -> loadFENHandle model
     AppApplyEditChanges -> applyEditChangesHandle model
@@ -144,7 +145,8 @@ setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & previousPositions .~ Seq.singleton (position, "", "", "")
+        & positionTree .~ Node (position, "", "", "") []
+        & positionTreePath .~ []
         & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
         & sanMoves .~ ""
@@ -263,7 +265,8 @@ runNextPlyHandle model@(AppModel{..}) = response where
         else
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
-                & previousPositions .~ pp :<| cutOffPreviousPositions
+                & positionTree .~ newPositionTree
+                & positionTreePath .~ cutOffPositionTreePath <> [0]
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ newSanMoves
@@ -273,6 +276,8 @@ runNextPlyHandle model@(AppModel{..}) = response where
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
+    newPositionTree = insertTree cutOffPositionTreePath pp _amPositionTree
+    cutOffPositionTreePath = take _amCurrentPlyNumber _amPositionTreePath
     pp = (fromJust newPosition, newSanMoves, newUciMoves, san)
     newSanMoves = _amSanMoves <> numberText <> " " <> san
     newFEN = pack $ toFEN $ fromJust newPosition
@@ -282,9 +287,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
     number = showt $ moveNumber _amChessPosition
     san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
     newUciMoves = uciMoves <> " " <> toUCI (fromJust _amNextPly)
-    (_, _, uciMoves, _) :<| _ = cutOffPreviousPositions
-    cutOffPreviousPositions = Seq.drop i _amPreviousPositions
-    i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
+    (_, _, uciMoves, _) = indexPositionTree model _amCurrentPlyNumber
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model@(AppModel{..}) = response where
@@ -346,38 +349,61 @@ setResponseThreadHandle v model = [Model $ model & responseThread .~ v]
 
 plyNumberChangedHandle :: Int -> EventHandle
 plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
-    response = if newPlyNumber < 0 || newPlyNumber > l-1
+    response = if newPlyNumber < 0 || newPlyNumber > maxPlyNumber
         then []
         else
             [ Model $ model
-                & chessPosition .~ previousPosition
+                & chessPosition .~ position
                 & currentPlyNumber .~ newPlyNumber
                 & showPromotionMenu .~ False
                 & sanMoves .~ moves
-                & forsythEdwards .~ pack (toFEN previousPosition)
+                & forsythEdwards .~ pack (toFEN position)
                 & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
-    (previousPosition, moves, _, _) = fromJust lookupResult
-    lookupResult = Seq.lookup (l-newPlyNumber-1) _amPreviousPositions
-    l = Seq.length _amPreviousPositions
+    maxPlyNumber = length _amPositionTreePath
+    (position, moves, _, _) = indexPositionTree model newPlyNumber
+
+positionTreePathChangedHandle :: Int -> EventHandle
+positionTreePathChangedHandle v model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & chessPosition .~ position
+            & positionTreePath .~ newTreePath
+            & showPromotionMenu .~ False
+            & sanMoves .~ moves
+            & forsythEdwards .~ pack (toFEN position)
+            & aiData . aiMessage .~ Nothing
+        , Event AppSyncBoard
+        , Event AppRunAnalysis
+        ]
+    Node (position, moves, _, _) _ = indexTree path _amPositionTree
+    path = take _amCurrentPlyNumber newTreePath
+    newTreePath = initTreePath <> replicate tailDepth 0
+    tailDepth = getTreeTailDepth initTreePath _amPositionTree
+    initTreePath = take (_amCurrentPlyNumber-1) _amPositionTreePath <> [v]
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & chessPosition .~ previousPosition
-            & previousPositions .~ Seq.drop 1 _amPreviousPositions
-            & currentPlyNumber .~ Seq.length _amPreviousPositions-2
+            & chessPosition .~ position
+            & positionTree .~ newPositionTree
+            & positionTreePath .~ newTreePath
+            & currentPlyNumber .~ length newTreePath
             & showPromotionMenu .~ False
             & sanMoves .~ moves
-            & forsythEdwards .~ pack (toFEN previousPosition)
+            & forsythEdwards .~ pack (toFEN position)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
-    _ :<| (previousPosition, moves, _, _) :<| _ = _amPreviousPositions
+    Node (position, moves, _, _) _ = indexTree newTreePath newPositionTree
+    newTreePath = initTreePath <> replicate tailDepth 0
+    tailDepth = getTreeTailDepth initTreePath newPositionTree
+    initTreePath = init _amPositionTreePath
+    newPositionTree = pruneTree _amPositionTreePath _amPositionTree
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where
@@ -466,9 +492,8 @@ runAnalysisHandle model@(AppModel{..}) = response where
             _ <- tryTakeMVar bestSyncVar
             putMVar bestSyncVar ()
         uciRequestAnalysis _amUciData initPos pos uciMoves
-    _ :|> (initPos, _, _, _) = _amPreviousPositions
-    (pos, _, uciMoves, _) = fromJust $ Seq.lookup i _amPreviousPositions
-    i = Seq.length _amPreviousPositions - _amCurrentPlyNumber - 1
+    (initPos, _, _, _) = indexPositionTree model 0
+    (pos, _, uciMoves, _) = indexPositionTree model _amCurrentPlyNumber
     AIData{..} = _amAiData
 
 sendEngineRequestHandle :: String -> EventHandle

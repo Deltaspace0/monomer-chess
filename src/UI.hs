@@ -6,13 +6,12 @@ module UI
     ) where
 
 import Data.Maybe
-import Data.Sequence (Seq(..))
+import Data.Tree (Tree(..))
 import Game.Chess
 import Monomer hiding (Color)
 import Monomer.Checkerboard
 import Monomer.Dragboard
 import TextShow
-import qualified Data.Sequence as Seq
 
 import Composites
 import Model
@@ -78,33 +77,44 @@ buildUI _ model@(AppModel{..}) = tree where
         [ 0
         , _amCurrentPlyNumber-1
         , _amCurrentPlyNumber+1
-        , Seq.length _amPreviousPositions-1
+        , length _amPositionTreePath
         ]
     notFirstPosition = _amCurrentPlyNumber > 0
-    notLastPosition = _amCurrentPlyNumber < Seq.length _amPreviousPositions-1
+    notLastPosition = _amCurrentPlyNumber < length _amPositionTreePath
     moveLines = makeHistoryLine <$> if firstMoveColor == White
-        then [0..(Seq.length _amPreviousPositions) `div` 2 - 1]
-        else [0..(Seq.length _amPreviousPositions + 1) `div` 2 - 1]
+        then [0..(length _amPositionTreePath + 1) `div` 2 - 1]
+        else [0..(length _amPositionTreePath + 2) `div` 2 - 1]
     makeHistoryLine i = hstack
         [ labelS (i+1) `styleBasic` [sizeReqW $ fixedSize 30]
         , hgrid_ [childSpacing_ 4]
             [ if i1 < 1
                 then filler
-                else optionButton_ t1 i1 currentPlyNumber
-                    [onChange AppPlyNumberChanged]
-            , if l-i2 < 0
+                else plyHistoryButton i1 `nodeKey` ("his" <> (showt i1))
+            , if length _amPositionTreePath-i2 < 0
                 then filler
-                else optionButton_ t2 i2 currentPlyNumber
-                    [onChange AppPlyNumberChanged]
+                else plyHistoryButton i2 `nodeKey` ("his" <> (showt i2))
             ] `styleBasic` [sizeReqW $ fixedSize 164]
         ] where
-            (_, _, _, t1) = Seq.index _amPreviousPositions $ l-i1
-            (_, _, _, t2) = Seq.index _amPreviousPositions $ l-i2
-            l = Seq.length _amPreviousPositions-1
             (i1, i2) = if firstMoveColor == White
                 then (i*2+1, i*2+2)
                 else (i*2, i*2+1)
-    firstMoveColor = let _ :|> (p, _, _, _) = _amPreviousPositions in color p
+    plyHistoryButton i = result where
+        result = if i /= _amCurrentPlyNumber || noChoice
+            then optionButton_ sanCaption i currentPlyNumber
+                [onChange AppPlyNumberChanged]
+            else textDropdownV_ currentPathIndex AppPositionTreePathChanged
+                [0..length childNodes-1] convertPathToSan []
+        sanCaption = if noChoice
+            then t
+            else t <> "..."
+        noChoice = length childNodes < 2
+        Node (_, _, _, t) _ = childNodes!!currentPathIndex
+        Node _ childNodes = indexTree slicePath _amPositionTree
+        currentPathIndex = _amPositionTreePath!!(i-1)
+        convertPathToSan pathIndex = resultSan where
+            Node (_, _, _, resultSan) _ = childNodes!!pathIndex
+        slicePath = take (i-1) _amPositionTreePath
+    firstMoveColor = let (p, _, _, _) = indexPositionTree model 0 in color p
     rightPanel = vstack' $ dropRemoveCont <$> if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`
@@ -173,11 +183,11 @@ buildUI _ model@(AppModel{..}) = tree where
                 else
                     [ button "Play next response" AppPlayNextResponse
                         `nodeEnabled` (not noLegalMoves)
-                    , button "Undo move" AppUndoMove
-                        `nodeEnabled` (length _amPreviousPositions >= 2)
+                    , button "Undo move" AppUndoMove `nodeEnabled` canUndo
                     ]
             , button "Refresh analysis" AppRunAnalysis
             ]
+    canUndo = let (Node _ xs) = _amPositionTree in not $ null xs
     resetTwoBoardsButtons = hgrid'
         [ button "Reset board" (AppSetPosition startpos)
             `nodeEnabled` not calculatingResponse
@@ -250,7 +260,7 @@ buildUI _ model@(AppModel{..}) = tree where
         ]
     gameTurnText = if noLegalMoves
         then "No legal moves"
-        else if color _amChessPosition == White
+        else if isWhiteTurn model
             then "White's turn"
             else "Black's turn"
     currentDepthText = if null _uciCurrentEngineDepth
