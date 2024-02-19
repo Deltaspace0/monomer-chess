@@ -126,11 +126,13 @@ buildUI _ model@(AppModel{..}) = tree where
             , filler
             ]
         else
-            [ zstack
-                [ label "Moves (PGN)"
-                , box_ [alignRight] $ button "Load" AppLoadPGN
+            [ widgetIf (not _amShowEditMenu) $ vstack'
+                [ zstack
+                    [ label "Moves (PGN)"
+                    , box_ [alignRight] $ button "Import PGN" AppLoadPGN
+                    ]
+                , textArea sanMoves `styleBasic` [sizeReqH $ fixedSize 128]
                 ]
-            , textArea sanMoves `styleBasic` [sizeReqH $ fixedSize 128]
             , hstack'
                 [ label "FEN:"
                 , textField forsythEdwards
