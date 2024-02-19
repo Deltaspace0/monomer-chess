@@ -86,7 +86,9 @@ uciMove
     -> Maybe (MVar String, MVar ())
     -> IO (Maybe Ply, Maybe Text)
 uciMove position maybeVar = result where
-    result = maybe noMVarMessage (getBestMove . fst) maybeVar
+    result = if null (legalPlies position)
+        then return (Nothing, Just "No legal moves")
+        else maybe noMVarMessage (getBestMove . fst) maybeVar
     noMVarMessage = return (Nothing, Just "MVar is not initialized")
     getBestMove bestMoveVar = do
         uciText <- takeMVar bestMoveVar
