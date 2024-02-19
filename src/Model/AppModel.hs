@@ -162,9 +162,9 @@ getTreeTailDepth path tree = go $ indexTree path tree where
     go (Node _ childNodes) = 1 + go (head childNodes)
 
 treeToSanMoves :: Tree PP -> Text
-treeToSanMoves (Node _ childNodes) = result where
+treeToSanMoves (Node (position, _, _, _) childNodes) = result where
     result = pack $ show $ gameDoc depthFirst game
-    game = gameFromForest [] tree Undecided
+    game = gameFromForest [("FEN", pack $ toFEN position)] tree Undecided
     tree = (extractPly <$>) <$> childNodes
     extractPly (_, ply, _, _) = fromJust ply
 
