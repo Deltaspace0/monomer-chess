@@ -46,7 +46,7 @@ data AppEvent
     | AppPlyNumberChanged Int
     | AppPositionTreePathChanged Int
     | AppUndoMove
-    | AppSetPositionTree (Tree (Position, Maybe Ply, String, Text))
+    | AppSetGame Game
     | AppLoadPGN
     | AppLoadFEN
     | AppApplyEditChanges
@@ -95,7 +95,7 @@ handleEvent _ _ model event = case event of
     AppPlyNumberChanged v -> plyNumberChangedHandle v model
     AppPositionTreePathChanged v -> positionTreePathChangedHandle v model
     AppUndoMove -> undoMoveHandle model
-    AppSetPositionTree v -> setPositionTreeHandle v model
+    AppSetGame v -> setGameHandle v model
     AppLoadPGN -> loadPGNHandle model
     AppLoadFEN -> loadFENHandle model
     AppApplyEditChanges -> applyEditChangesHandle model
@@ -409,30 +409,31 @@ undoMoveHandle model@(AppModel{..}) = response where
     initTreePath = init _amPositionTreePath
     newPositionTree = pruneTree _amPositionTreePath _amPositionTree
 
-setPositionTreeHandle
-    :: Tree (Position, Maybe Ply, String, Text)
-    -> EventHandle
-setPositionTreeHandle tree model = response where
+setGameHandle :: Game -> EventHandle
+setGameHandle CG{..} model = response where
     response =
         [ Model $ model
-            & chessPosition .~ startpos
+            & chessPosition .~ position
             & positionTree .~ tree
             & positionTreePath .~ newTreePath
             & currentPlyNumber .~ 0
             & showPromotionMenu .~ False
-            & forsythEdwards .~ pack (toFEN startpos)
+            & forsythEdwards .~ fromMaybe (pack (toFEN startpos)) gameFEN
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
+    position = fromMaybe startpos $ gameFEN >>= fromFEN . unpack
+    gameFEN = lookup "FEN" _cgTags
     newTreePath = replicate (getTreeTailDepth [] tree) 0
+    tree = toPositionTree position $ (_annPly <$>) <$> _cgForest
 
 loadPGNHandle :: EventHandle
 loadPGNHandle AppModel{..} = response where
     response = case parseMaybe pgn (encodeUtf8 $ _amSanMoves <> "*") of
+        Just (PGN []) -> []
+        Just (PGN (x:_)) -> [Event $ AppSetGame x]
         Nothing -> [Event $ AppSetErrorMessage $ Just "Invalid PGN"]
-        Just parsedPGN -> [Event $ setTree $ pgnForest parsedPGN]
-    setTree = AppSetPositionTree . toPositionTree
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where

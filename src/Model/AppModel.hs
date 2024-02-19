@@ -168,9 +168,9 @@ treeToSanMoves (Node (position, _, _, _) childNodes) = result where
     tree = (extractPly <$>) <$> childNodes
     extractPly (_, ply, _, _) = fromJust ply
 
-toPositionTree :: [Tree Ply] -> Tree PP
-toPositionTree treePlies = result where
-    result = buildTree (startpos, Nothing, "", "") treePlies
+toPositionTree :: Position -> [Tree Ply] -> Tree PP
+toPositionTree position treePlies = result where
+    result = buildTree (position, Nothing, "", "") treePlies
     buildTree pp trees = Node pp $ f <$> trees where
         f (Node ply childPlies) = buildTree (getNextPP pp ply) childPlies
 
