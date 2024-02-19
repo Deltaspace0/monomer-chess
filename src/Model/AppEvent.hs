@@ -13,12 +13,14 @@ import Control.Monad
 import Data.IORef
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
+import Data.Text.Encoding
 import Data.Tree (Tree(..))
 import Game.Chess
-import Game.Chess.SAN
+import Game.Chess.PGN
 import Monomer
 import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
+import Text.Megaparsec
 
 import Model.AppModel
 
@@ -44,6 +46,8 @@ data AppEvent
     | AppPlyNumberChanged Int
     | AppPositionTreePathChanged Int
     | AppUndoMove
+    | AppSetPositionTree (Tree (Position, Maybe Ply, String, Text))
+    | AppLoadPGN
     | AppLoadFEN
     | AppApplyEditChanges
     | AppClearEditBoard
@@ -91,6 +95,8 @@ handleEvent _ _ model event = case event of
     AppPlyNumberChanged v -> plyNumberChangedHandle v model
     AppPositionTreePathChanged v -> positionTreePathChangedHandle v model
     AppUndoMove -> undoMoveHandle model
+    AppSetPositionTree v -> setPositionTreeHandle v model
+    AppLoadPGN -> loadPGNHandle model
     AppLoadFEN -> loadFENHandle model
     AppApplyEditChanges -> applyEditChangesHandle model
     AppClearEditBoard -> clearEditBoardHandle model
@@ -269,7 +275,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ treeToSanMoves newPositionTree
-                & forsythEdwards .~ newFEN
+                & forsythEdwards .~ pack (toFEN $ fromJust newPosition)
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
@@ -286,11 +292,8 @@ runNextPlyHandle model@(AppModel{..}) = response where
     addTail p = p <> replicate (getTreeTailDepth p _amPositionTree) 0
     insertResult = insertTree cutOffPositionTreePath pp _amPositionTree
     cutOffPositionTreePath = take _amCurrentPlyNumber _amPositionTreePath
-    pp = (fromJust newPosition, _amNextPly, newUciMoves, san)
-    newFEN = pack $ toFEN $ fromJust newPosition
-    san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
-    newUciMoves = uciMoves <> " " <> toUCI (fromJust _amNextPly)
-    (_, _, uciMoves, _) = indexPositionTree model _amCurrentPlyNumber
+    pp = getNextPP ppOld $ fromJust _amNextPly
+    ppOld = indexPositionTree model _amCurrentPlyNumber
 
 promoteHandle :: PieceType -> EventHandle
 promoteHandle pieceType model@(AppModel{..}) = response where
@@ -405,6 +408,31 @@ undoMoveHandle model@(AppModel{..}) = response where
     tailDepth = getTreeTailDepth initTreePath newPositionTree
     initTreePath = init _amPositionTreePath
     newPositionTree = pruneTree _amPositionTreePath _amPositionTree
+
+setPositionTreeHandle
+    :: Tree (Position, Maybe Ply, String, Text)
+    -> EventHandle
+setPositionTreeHandle tree model = response where
+    response =
+        [ Model $ model
+            & chessPosition .~ startpos
+            & positionTree .~ tree
+            & positionTreePath .~ newTreePath
+            & currentPlyNumber .~ 0
+            & showPromotionMenu .~ False
+            & forsythEdwards .~ pack (toFEN startpos)
+            & aiData . aiMessage .~ Nothing
+        , Event AppSyncBoard
+        , Event AppRunAnalysis
+        ]
+    newTreePath = replicate (getTreeTailDepth [] tree) 0
+
+loadPGNHandle :: EventHandle
+loadPGNHandle AppModel{..} = response where
+    response = case parseMaybe pgn (encodeUtf8 $ _amSanMoves <> "*") of
+        Nothing -> [Event $ AppSetErrorMessage $ Just "Invalid PGN"]
+        Just parsedPGN -> [Event $ setTree $ pgnForest parsedPGN]
+    setTree = AppSetPositionTree . toPositionTree
 
 loadFENHandle :: EventHandle
 loadFENHandle AppModel{..} = [Task taskHandler] where

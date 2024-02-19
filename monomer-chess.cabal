@@ -59,6 +59,7 @@ library
     , directory
     , http-client
     , lens
+    , megaparsec
     , monomer
     , monomer-widgets
     , process
@@ -87,6 +88,7 @@ executable monomer-chess-exe
     , directory
     , http-client
     , lens
+    , megaparsec
     , monomer
     , monomer-chess
     , monomer-widgets
@@ -117,6 +119,7 @@ test-suite monomer-chess-test
     , directory
     , http-client
     , lens
+    , megaparsec
     , monomer
     , monomer-chess
     , monomer-widgets

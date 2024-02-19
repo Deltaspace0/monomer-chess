@@ -41,6 +41,8 @@ module Model.AppModel
     , pruneTree
     , getTreeTailDepth
     , treeToSanMoves
+    , toPositionTree
+    , getNextPP
     , getPathOrColor
     , validateMove
     , getPromotedPly
@@ -51,6 +53,7 @@ import Control.Concurrent
 import Control.Lens
 import Game.Chess
 import Game.Chess.PGN
+import Game.Chess.SAN
 import Data.Text (pack, Text)
 import Data.Maybe
 import Data.Tree (Tree(..))
@@ -164,6 +167,19 @@ treeToSanMoves (Node _ childNodes) = result where
     game = gameFromForest [] tree Undecided
     tree = (extractPly <$>) <$> childNodes
     extractPly (_, ply, _, _) = fromJust ply
+
+toPositionTree :: [Tree Ply] -> Tree PP
+toPositionTree treePlies = result where
+    result = buildTree (startpos, Nothing, "", "") treePlies
+    buildTree pp trees = Node pp $ f <$> trees where
+        f (Node ply childPlies) = buildTree (getNextPP pp ply) childPlies
+
+getNextPP :: PP -> Ply -> PP
+getNextPP (position, _, uciMoves, _) ply = result where
+    result = (newPosition, Just ply, newUciMoves, san)
+    newPosition = unsafeDoPly position ply
+    newUciMoves = uciMoves <> " " <> toUCI ply
+    san = pack $ unsafeToSAN position ply
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color
 getPathOrColor AppModel{..} (color, pieceType) = result where
