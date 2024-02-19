@@ -40,6 +40,7 @@ module Model.AppModel
     , insertTree
     , pruneTree
     , getTreeTailDepth
+    , treeToSanMoves
     , getPathOrColor
     , validateMove
     , getPromotedPly
@@ -49,7 +50,9 @@ module Model.AppModel
 import Control.Concurrent
 import Control.Lens
 import Game.Chess
+import Game.Chess.PGN
 import Data.Text (pack, Text)
+import Data.Maybe
 import Data.Tree (Tree(..))
 import qualified Monomer as M
 
@@ -58,7 +61,7 @@ import Model.FENData
 import Model.Tablebase
 import Model.UCI
 
-type PP = (Position, Text, String, Text)
+type PP = (Position, Maybe Ply, String, Text)
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
@@ -94,7 +97,7 @@ initModel = AppModel
     { _amBoardState = startState
     , _amBoardStateReversed = startStateReversed
     , _amChessPosition = startpos
-    , _amPositionTree = Node (startpos, "", "", "") []
+    , _amPositionTree = Node (startpos, Nothing, "", "") []
     , _amPositionTreePath = []
     , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
@@ -154,6 +157,13 @@ getTreeTailDepth :: [Int] -> Tree a -> Int
 getTreeTailDepth path tree = go $ indexTree path tree where
     go (Node _ []) = 0
     go (Node _ childNodes) = 1 + go (head childNodes)
+
+treeToSanMoves :: Tree PP -> Text
+treeToSanMoves (Node _ childNodes) = result where
+    result = pack $ show $ gameDoc depthFirst game
+    game = gameFromForest [] tree Undecided
+    tree = (extractPly <$>) <$> childNodes
+    extractPly (_, ply, _, _) = fromJust ply
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color
 getPathOrColor AppModel{..} (color, pieceType) = result where

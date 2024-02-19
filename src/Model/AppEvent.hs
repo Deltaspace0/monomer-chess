@@ -19,7 +19,6 @@ import Game.Chess.SAN
 import Monomer
 import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
-import TextShow
 
 import Model.AppModel
 
@@ -145,7 +144,7 @@ setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & positionTree .~ Node (position, "", "", "") []
+        & positionTree .~ Node (position, Nothing, "", "") []
         & positionTreePath .~ []
         & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
@@ -269,7 +268,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
                 & positionTreePath .~ newPositionTreePath
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
-                & sanMoves .~ newSanMoves
+                & sanMoves .~ treeToSanMoves newPositionTree
                 & forsythEdwards .~ newFEN
             , Event AppSyncBoard
             , Event AppRunAnalysis
@@ -287,13 +286,8 @@ runNextPlyHandle model@(AppModel{..}) = response where
     addTail p = p <> replicate (getTreeTailDepth p _amPositionTree) 0
     insertResult = insertTree cutOffPositionTreePath pp _amPositionTree
     cutOffPositionTreePath = take _amCurrentPlyNumber _amPositionTreePath
-    pp = (fromJust newPosition, newSanMoves, newUciMoves, san)
-    newSanMoves = _amSanMoves <> numberText <> " " <> san
+    pp = (fromJust newPosition, _amNextPly, newUciMoves, san)
     newFEN = pack $ toFEN $ fromJust newPosition
-    numberText = if color _amChessPosition == White
-        then (if _amSanMoves == "" then "" else " ") <> number <> "."
-        else (if _amSanMoves == "" then "1..." else "")
-    number = showt $ moveNumber _amChessPosition
     san = pack $ unsafeToSAN _amChessPosition $ fromJust _amNextPly
     newUciMoves = uciMoves <> " " <> toUCI (fromJust _amNextPly)
     (_, _, uciMoves, _) = indexPositionTree model _amCurrentPlyNumber
@@ -365,14 +359,13 @@ plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
                 & chessPosition .~ position
                 & currentPlyNumber .~ newPlyNumber
                 & showPromotionMenu .~ False
-                & sanMoves .~ moves
                 & forsythEdwards .~ pack (toFEN position)
                 & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
     maxPlyNumber = length _amPositionTreePath
-    (position, moves, _, _) = indexPositionTree model newPlyNumber
+    (position, _, _, _) = indexPositionTree model newPlyNumber
 
 positionTreePathChangedHandle :: Int -> EventHandle
 positionTreePathChangedHandle v model@(AppModel{..}) = response where
@@ -381,13 +374,12 @@ positionTreePathChangedHandle v model@(AppModel{..}) = response where
             & chessPosition .~ position
             & positionTreePath .~ newTreePath
             & showPromotionMenu .~ False
-            & sanMoves .~ moves
             & forsythEdwards .~ pack (toFEN position)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
-    Node (position, moves, _, _) _ = indexTree path _amPositionTree
+    Node (position, _, _, _) _ = indexTree path _amPositionTree
     path = take _amCurrentPlyNumber newTreePath
     newTreePath = initTreePath <> replicate tailDepth 0
     tailDepth = getTreeTailDepth initTreePath _amPositionTree
@@ -402,13 +394,13 @@ undoMoveHandle model@(AppModel{..}) = response where
             & positionTreePath .~ newTreePath
             & currentPlyNumber .~ length newTreePath
             & showPromotionMenu .~ False
-            & sanMoves .~ moves
+            & sanMoves .~ treeToSanMoves newPositionTree
             & forsythEdwards .~ pack (toFEN position)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
-    Node (position, moves, _, _) _ = indexTree newTreePath newPositionTree
+    Node (position, _, _, _) _ = indexTree newTreePath newPositionTree
     newTreePath = initTreePath <> replicate tailDepth 0
     tailDepth = getTreeTailDepth initTreePath newPositionTree
     initTreePath = init _amPositionTreePath

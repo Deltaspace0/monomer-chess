@@ -126,10 +126,9 @@ buildUI _ model@(AppModel{..}) = tree where
             , filler
             ]
         else
-            [ hstack'
-                [ label "Moves:"
-                , textField_ sanMoves [readOnly]
-                ]
+            [ label "Moves (PGN)"
+            , textArea_ sanMoves [readOnly]
+                `styleBasic` [sizeReqH $ fixedSize 128]
             , hstack'
                 [ label "FEN:"
                 , textField forsythEdwards
