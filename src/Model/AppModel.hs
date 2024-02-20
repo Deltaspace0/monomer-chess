@@ -8,6 +8,7 @@ module Model.AppModel
     , module Model.FENData
     , module Model.Tablebase
     , module Model.UCI
+    , PP(..)
     , AppModel(..)
     , boardState
     , boardStateReversed
@@ -35,6 +36,7 @@ module Model.AppModel
     , uciRecordLogs
     , initModel
     , isWhiteTurn
+    , treeFromPosition
     , indexPositionTree
     , indexTree
     , insertTree
@@ -64,7 +66,12 @@ import Model.FENData
 import Model.Tablebase
 import Model.UCI
 
-type PP = (Position, Maybe Ply, String, Text)
+data PP = PP
+    { _ppPosition :: Position
+    , _ppPly :: Maybe Ply
+    , _ppUciMoves :: String
+    , _ppSan :: Text
+    } deriving (Eq, Show)
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
@@ -100,7 +107,7 @@ initModel = AppModel
     { _amBoardState = startState
     , _amBoardStateReversed = startStateReversed
     , _amChessPosition = startpos
-    , _amPositionTree = Node (startpos, Nothing, "", "") []
+    , _amPositionTree = treeFromPosition startpos
     , _amPositionTreePath = []
     , _amCurrentPlyNumber = 0
     , _amNextPly = Nothing
@@ -127,6 +134,15 @@ initModel = AppModel
 isWhiteTurn :: AppModel -> Bool
 isWhiteTurn AppModel{..} = color _amChessPosition == White
 
+treeFromPosition :: Position -> Tree PP
+treeFromPosition position = Node pp [] where
+    pp = PP
+        { _ppPosition = position
+        , _ppPly = Nothing
+        , _ppUciMoves = ""
+        , _ppSan = ""
+        }
+
 indexPositionTree :: AppModel -> Int -> PP
 indexPositionTree AppModel{..} i = result where
     Node result _ = indexTree (take i _amPositionTreePath) _amPositionTree
@@ -136,13 +152,13 @@ indexTree [] tree = tree
 indexTree (x:xs) (Node _ childNodes) = indexTree xs $ childNodes!!x
 
 insertTree :: [Int] -> PP -> Tree PP -> Either Int (Tree PP)
-insertTree [] pp@(_, _, _, t) (Node v childNodes) = result where
+insertTree [] pp (Node v childNodes) = result where
     result = if existingIndex == -1
         then Right $ Node v $ (Node pp []):childNodes
         else Left existingIndex
     existingIndex = findExistingIndex childNodes 0
     findExistingIndex [] _ = -1
-    findExistingIndex ((Node (_, _, _, t') _):xs) i = if t == t'
+    findExistingIndex ((Node pp' _):xs) i = if _ppSan pp == _ppSan pp'
         then i
         else findExistingIndex xs $ i+1
 insertTree (x:xs) pp (Node v childNodes) = result where
@@ -162,24 +178,25 @@ getTreeTailDepth path tree = go $ indexTree path tree where
     go (Node _ childNodes) = 1 + go (head childNodes)
 
 treeToSanMoves :: Tree PP -> Text
-treeToSanMoves (Node (position, _, _, _) childNodes) = result where
+treeToSanMoves (Node pp childNodes) = result where
     result = pack $ show $ gameDoc depthFirst game
-    game = gameFromForest [("FEN", pack $ toFEN position)] tree Undecided
-    tree = (extractPly <$>) <$> childNodes
-    extractPly (_, ply, _, _) = fromJust ply
+    game = gameFromForest tags tree Undecided
+    tags = [("FEN", pack $ toFEN $ _ppPosition pp)]
+    tree = (fromJust . _ppPly <$>) <$> childNodes
 
 toPositionTree :: Position -> [Tree Ply] -> Tree PP
-toPositionTree position treePlies = result where
-    result = buildTree (position, Nothing, "", "") treePlies
+toPositionTree position treePlies = buildTree initPP treePlies where
     buildTree pp trees = Node pp $ f <$> trees where
         f (Node ply childPlies) = buildTree (getNextPP pp ply) childPlies
+    Node initPP _ = treeFromPosition position
 
 getNextPP :: PP -> Ply -> PP
-getNextPP (position, _, uciMoves, _) ply = result where
-    result = (newPosition, Just ply, newUciMoves, san)
-    newPosition = unsafeDoPly position ply
-    newUciMoves = uciMoves <> " " <> toUCI ply
-    san = pack $ unsafeToSAN position ply
+getNextPP PP{..} ply = PP
+    { _ppPosition = unsafeDoPly _ppPosition ply
+    , _ppPly = Just ply
+    , _ppUciMoves = _ppUciMoves <> " " <> toUCI ply
+    , _ppSan = pack $ unsafeToSAN _ppPosition ply
+    }
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color
 getPathOrColor AppModel{..} (color, pieceType) = result where

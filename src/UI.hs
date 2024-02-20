@@ -105,16 +105,16 @@ buildUI _ model@(AppModel{..}) = tree where
             else textDropdownV_ currentPathIndex AppPositionTreePathChanged
                 [0..length childNodes-1] convertPathToSan []
         sanCaption = if noChoice
-            then t
-            else t <> "..."
+            then _ppSan pp
+            else _ppSan pp <> "..."
         noChoice = length childNodes < 2
-        Node (_, _, _, t) _ = childNodes!!currentPathIndex
+        Node pp _ = childNodes!!currentPathIndex
         Node _ childNodes = indexTree slicePath _amPositionTree
         currentPathIndex = _amPositionTreePath!!(i-1)
-        convertPathToSan pathIndex = resultSan where
-            Node (_, _, _, resultSan) _ = childNodes!!pathIndex
+        convertPathToSan pathIndex = _ppSan where
+            Node PP{..} _ = childNodes!!pathIndex
         slicePath = take (i-1) _amPositionTreePath
-    firstMoveColor = let (p, _, _, _) = indexPositionTree model 0 in color p
+    firstMoveColor = color $ _ppPosition $ indexPositionTree model 0
     rightPanel = vstack' $ dropRemoveCont <$> if _amShowTwoBoards
         then
             [ box' $ chessBoardRight `styleBasic`

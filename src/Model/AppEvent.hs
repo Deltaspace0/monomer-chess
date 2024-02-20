@@ -150,7 +150,7 @@ setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
     [ Model $ model
         & chessPosition .~ position
-        & positionTree .~ Node (position, Nothing, "", "") []
+        & positionTree .~ treeFromPosition position
         & positionTreePath .~ []
         & currentPlyNumber .~ 0
         & showPromotionMenu .~ False
@@ -359,30 +359,30 @@ plyNumberChangedHandle newPlyNumber model@(AppModel{..}) = response where
         then []
         else
             [ Model $ model
-                & chessPosition .~ position
+                & chessPosition .~ _ppPosition
                 & currentPlyNumber .~ newPlyNumber
                 & showPromotionMenu .~ False
-                & forsythEdwards .~ pack (toFEN position)
+                & forsythEdwards .~ pack (toFEN _ppPosition)
                 & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
             , Event AppRunAnalysis
             ]
     maxPlyNumber = length _amPositionTreePath
-    (position, _, _, _) = indexPositionTree model newPlyNumber
+    PP{..} = indexPositionTree model newPlyNumber
 
 positionTreePathChangedHandle :: Int -> EventHandle
 positionTreePathChangedHandle v model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & chessPosition .~ position
+            & chessPosition .~ _ppPosition
             & positionTreePath .~ newTreePath
             & showPromotionMenu .~ False
-            & forsythEdwards .~ pack (toFEN position)
+            & forsythEdwards .~ pack (toFEN _ppPosition)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
-    Node (position, _, _, _) _ = indexTree path _amPositionTree
+    Node PP{..} _ = indexTree path _amPositionTree
     path = take _amCurrentPlyNumber newTreePath
     newTreePath = initTreePath <> replicate tailDepth 0
     tailDepth = getTreeTailDepth initTreePath _amPositionTree
@@ -392,18 +392,18 @@ undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
     response =
         [ Model $ model
-            & chessPosition .~ position
+            & chessPosition .~ _ppPosition
             & positionTree .~ newPositionTree
             & positionTreePath .~ newTreePath
             & currentPlyNumber .~ length newTreePath
             & showPromotionMenu .~ False
             & sanMoves .~ treeToSanMoves newPositionTree
-            & forsythEdwards .~ pack (toFEN position)
+            & forsythEdwards .~ pack (toFEN _ppPosition)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
         , Event AppRunAnalysis
         ]
-    Node (position, _, _, _) _ = indexTree newTreePath newPositionTree
+    Node PP{..} _ = indexTree newTreePath newPositionTree
     newTreePath = initTreePath <> replicate tailDepth 0
     tailDepth = getTreeTailDepth initTreePath newPositionTree
     initTreePath = init _amPositionTreePath
@@ -521,9 +521,10 @@ runAnalysisHandle model@(AppModel{..}) = response where
             _ <- tryTakeMVar bestMoveVar
             _ <- tryTakeMVar bestSyncVar
             putMVar bestSyncVar ()
-        uciRequestAnalysis _amUciData initPos pos uciMoves
-    (initPos, _, _, _) = indexPositionTree model 0
-    (pos, _, uciMoves, _) = indexPositionTree model _amCurrentPlyNumber
+        uciRequestAnalysis _amUciData initPos pos $ _ppUciMoves currentPP
+    pos = _ppPosition currentPP
+    initPos = _ppPosition $ indexPositionTree model 0
+    currentPP = indexPositionTree model _amCurrentPlyNumber
     AIData{..} = _amAiData
 
 sendEngineRequestHandle :: String -> EventHandle
