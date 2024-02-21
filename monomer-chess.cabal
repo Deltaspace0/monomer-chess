@@ -39,6 +39,7 @@ library
       Model.AppEvent
       Model.AppModel
       Model.FENData
+      Model.PositionTree
       Model.Tablebase
       Model.UCI
       Model.UCIOptions
