@@ -14,6 +14,7 @@ module Model.AppModel
     , boardStateReversed
     , nextPly
     , chessPosition
+    , evalGroups
     , positionTree
     , positionTreePath
     , currentPlyNumber
@@ -37,11 +38,13 @@ module Model.AppModel
     , initModel
     , isWhiteTurn
     , treeFromPosition
+    , treeSwitchValue
     , indexPositionTree
     , indexTree
     , insertTree
     , pruneTree
     , getTreeTailDepth
+    , treeToList
     , treeToSanMoves
     , toPositionTree
     , getNextPP
@@ -71,12 +74,14 @@ data PP = PP
     , _ppPly :: Maybe Ply
     , _ppUciMoves :: String
     , _ppSan :: Text
+    , _ppEval :: Maybe Double
     } deriving (Eq, Show)
 
 data AppModel = AppModel
     { _amBoardState :: [[Piece]]
     , _amBoardStateReversed :: [[Piece]]
     , _amChessPosition :: Position
+    , _amEvalGroups :: [[(Double, Double)]]
     , _amPositionTree :: Tree PP
     , _amPositionTreePath :: [Int]
     , _amCurrentPlyNumber :: Int
@@ -107,6 +112,7 @@ initModel = AppModel
     { _amBoardState = startState
     , _amBoardStateReversed = startStateReversed
     , _amChessPosition = startpos
+    , _amEvalGroups = []
     , _amPositionTree = treeFromPosition startpos
     , _amPositionTreePath = []
     , _amCurrentPlyNumber = 0
@@ -141,7 +147,11 @@ treeFromPosition position = Node pp [] where
         , _ppPly = Nothing
         , _ppUciMoves = ""
         , _ppSan = ""
+        , _ppEval = Nothing
         }
+
+treeSwitchValue :: a -> Tree a -> Tree a
+treeSwitchValue newValue (Node _ childNodes) = Node newValue childNodes
 
 indexPositionTree :: AppModel -> Int -> PP
 indexPositionTree AppModel{..} i = result where
@@ -151,20 +161,19 @@ indexTree :: [Int] -> Tree a -> Tree a
 indexTree [] tree = tree
 indexTree (x:xs) (Node _ childNodes) = indexTree xs $ childNodes!!x
 
-insertTree :: [Int] -> PP -> Tree PP -> Either Int (Tree PP)
-insertTree [] pp (Node v childNodes) = result where
-    result = if existingIndex == -1
-        then Right $ Node v $ (Node pp []):childNodes
-        else Left existingIndex
+insertTree :: [Int] -> PP -> Tree PP -> (Tree PP, Maybe Int)
+insertTree [] pp (Node v childNodes) = (resultTree, existingIndex) where
+    resultTree = Node v $ case existingIndex of
+        Nothing -> (Node pp []):childNodes
+        Just exi -> childNodes & ix exi %~ treeSwitchValue pp
     existingIndex = findExistingIndex childNodes 0
-    findExistingIndex [] _ = -1
+    findExistingIndex [] _ = Nothing
     findExistingIndex ((Node pp' _):xs) i = if _ppSan pp == _ppSan pp'
-        then i
+        then Just i
         else findExistingIndex xs $ i+1
-insertTree (x:xs) pp (Node v childNodes) = result where
-    result = case insertTree xs pp (childNodes!!x) of
-        Left existingIndex -> Left existingIndex
-        Right newTree -> Right $ Node v $ childNodes & ix x .~ newTree
+insertTree (x:xs) pp (Node v childNodes) = (resultTree, existingIndex) where
+    resultTree = Node v $ childNodes & ix x .~ newTree
+    (newTree, existingIndex) = insertTree xs pp $ childNodes!!x
 
 pruneTree :: [Int] -> Tree a -> Tree a
 pruneTree [] _ = error "empty prune path"
@@ -176,6 +185,10 @@ getTreeTailDepth :: [Int] -> Tree a -> Int
 getTreeTailDepth path tree = go $ indexTree path tree where
     go (Node _ []) = 0
     go (Node _ childNodes) = 1 + go (head childNodes)
+
+treeToList :: [Int] -> Tree a -> [a]
+treeToList [] (Node v _) = [v]
+treeToList (x:xs) (Node v childNodes) = v:(treeToList xs $ childNodes!!x)
 
 treeToSanMoves :: Tree PP -> Text
 treeToSanMoves (Node pp childNodes) = result where
@@ -196,6 +209,7 @@ getNextPP PP{..} ply = PP
     , _ppPly = Just ply
     , _ppUciMoves = _ppUciMoves <> " " <> toUCI ply
     , _ppSan = pack $ unsafeToSAN _ppPosition ply
+    , _ppEval = Nothing
     }
 
 getPathOrColor :: AppModel -> Piece -> Either Text M.Color

@@ -28,6 +28,7 @@ data AppEvent
     = AppInit
     | AppSetPosition Position
     | AppSyncBoard
+    | AppSyncEvalGroups
     | AppBoardChanged ([[Piece]], Int, Int)
     | AppEditBoardChanged ([[Piece]], Int, Int)
     | AppEditBoardRemove DragId
@@ -57,7 +58,7 @@ data AppEvent
     | AppSetRequestMVars (Maybe (MVar String, MVar Position))
     | AppSetEngineLogChan (Maybe (Chan String))
     | AppSetCurrentEngineDepth (Maybe Text)
-    | AppSetPrincipalVariations [(Text, Maybe Ply)]
+    | AppSetPrincipalVariations [(Text, Maybe Ply, Maybe Double)]
     | AppSetOptionsUCI UCIOptions
     | AppRunAnalysis
     | AppSendEngineRequest String
@@ -77,6 +78,7 @@ handleEvent _ _ model event = case event of
     AppInit -> initHandle model
     AppSetPosition v -> setPositionHandle v model
     AppSyncBoard -> syncBoardHandle model
+    AppSyncEvalGroups -> syncEvalGroupsHandle model
     AppBoardChanged info -> boardChangedHandle info model
     AppEditBoardChanged info -> editBoardChangedHandle info model
     AppEditBoardRemove v -> editBoardRemoveHandle v model
@@ -168,8 +170,33 @@ syncBoardHandle model@(AppModel{..}) = response where
             & boardState .~ newState
             & boardStateReversed .~ newStateReversed
             & fenData .~ getFenData _amChessPosition
+        , Event AppSyncEvalGroups
         ]
     (newState, newStateReversed) = getBoardStates _amChessPosition
+
+syncEvalGroupsHandle :: EventHandle
+syncEvalGroupsHandle model@(AppModel{..}) = response where
+    response = [Model $ model & evalGroups .~ newEvalGroups]
+    newEvalGroups = fromJust <$> (filter isJust $ makeEvalGroups evalPoints)
+    makeEvalGroups [] = []
+    makeEvalGroups (Nothing:xs) = Nothing:(makeEvalGroups xs)
+    makeEvalGroups ((Just (x, y)):xs) = result where
+        result
+            | null gs || null (head gs) = (Just [(x, y), (x, 0)]):gs
+            | meet = (Just [(x, y), mp, mp]):(Just $ mp:headGroup):(tail gs)
+            | otherwise = (Just $ (x, y):headGroup):(tail gs)
+        meet = y*y' < 0
+        mp = (x+evalStep/(1-y'/y), if y' < 0 then -0.0001 else 0.0001)
+        y' = snd $ head headGroup
+        headGroup = fromJust $ head gs
+        gs = makeEvalGroups xs
+    evalPoints = zipWith makeEvalPoint [0..currentBranchLength] evals
+    makeEvalPoint i maybeEval = do
+        eval <- maybeEval
+        return ((fromIntegral i)*evalStep, (min 6 $ max (-6) eval)*0.027)
+    evalStep = 0.96/(fromIntegral currentBranchLength + 0.0001)
+    currentBranchLength = length _amPositionTreePath
+    evals = _ppEval <$> treeToList _amPositionTreePath _amPositionTree
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info@(_, ixTo, ixFrom) model@(AppModel{..})
@@ -271,7 +298,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
             [ Model $ model
                 & chessPosition .~ fromJust newPosition
                 & positionTree .~ newPositionTree
-                & positionTreePath .~ newPositionTreePath
+                & positionTreePath .~ newTreePath
                 & currentPlyNumber +~ 1
                 & showPromotionMenu .~ False
                 & sanMoves .~ treeToSanMoves newPositionTree
@@ -281,17 +308,14 @@ runNextPlyHandle model@(AppModel{..}) = response where
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
     newPosition = unsafeDoPly _amChessPosition <$> _amNextPly
-    newPositionTree = case insertResult of
-        Left _ -> _amPositionTree
-        Right tree -> tree
-    newPositionTreePath = case insertResult of
-        Left exi -> if exi == _amPositionTreePath!!_amCurrentPlyNumber
+    newTreePath = case exi of
+        Nothing -> cutOffPath <> [0]
+        Just i -> if i == _amPositionTreePath!!_amCurrentPlyNumber
             then _amPositionTreePath
-            else addTail $ cutOffPositionTreePath <> [exi]
-        Right _ -> cutOffPositionTreePath <> [0]
+            else addTail $ cutOffPath <> [i]
     addTail p = p <> replicate (getTreeTailDepth p _amPositionTree) 0
-    insertResult = insertTree cutOffPositionTreePath pp _amPositionTree
-    cutOffPositionTreePath = take _amCurrentPlyNumber _amPositionTreePath
+    (newPositionTree, exi) = insertTree cutOffPath pp _amPositionTree
+    cutOffPath = take _amCurrentPlyNumber _amPositionTreePath
     pp = getNextPP ppOld $ fromJust _amNextPly
     ppOld = indexPositionTree model _amCurrentPlyNumber
 
@@ -493,9 +517,26 @@ setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
 setCurrentEngineDepthHandle v model = response where
     response = [Model $ model & uciData . currentEngineDepth .~ v]
 
-setPrincipalVariationsHandle :: [(Text, Maybe Ply)] -> EventHandle
-setPrincipalVariationsHandle v model = response where
-    response = [Model $ model & uciData . principalVariations .~ v]
+setPrincipalVariationsHandle
+    :: [(Text, Maybe Ply, Maybe Double)]
+    -> EventHandle
+setPrincipalVariationsHandle v model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & positionTree .~ newPositionTree
+            & uciData . principalVariations .~ v
+        , Event AppSyncEvalGroups
+        ]
+    newPositionTree = if null newEval
+        then _amPositionTree
+        else head offsetChildNodes
+    Node _ offsetChildNodes = fst $ insertTree cutOffPath pp offsetTree
+    pp = ppOld {_ppEval = newEval}
+    ppOld = indexPositionTree model _amCurrentPlyNumber
+    cutOffPath = take _amCurrentPlyNumber $ 0:_amPositionTreePath
+    offsetTree = Node dummyValue [_amPositionTree]
+    Node dummyValue _ = _amPositionTree
+    newEval = listToMaybe v >>= \(_, _, x) -> x
 
 setOptionsUCIHandle :: UCIOptions -> EventHandle
 setOptionsUCIHandle v model = [Model $ model & uciData . optionsUCI .~ v]

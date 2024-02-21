@@ -11,6 +11,7 @@ import Game.Chess
 import Monomer hiding (Color)
 import Monomer.Checkerboard
 import Monomer.Dragboard
+import Monomer.Graph
 import TextShow
 
 import Composites
@@ -59,7 +60,7 @@ buildUI _ model@(AppModel{..}) = tree where
                     AppSetErrorMessage Nothing
             ]
         ] `styleBasic` [padding 16]
-    labelPV (caption, ply) = box_ [onClick $ AppDoPly ply] $ label caption
+    labelPV (caption, ply, _) = box_ [onClick $ AppDoPly ply] $ label caption
     dropRemoveCont = dropTarget AppEditBoardRemove
     keyShortcuts = zipWith (,) ["Up", "Left", "Right", "Down"] plyEvents
     moveHistoryPanel = vstack'
@@ -77,20 +78,21 @@ buildUI _ model@(AppModel{..}) = tree where
         [ 0
         , _amCurrentPlyNumber-1
         , _amCurrentPlyNumber+1
-        , length _amPositionTreePath
+        , currentBranchLength
         ]
+    currentBranchLength = length _amPositionTreePath
     notFirstPosition = _amCurrentPlyNumber > 0
-    notLastPosition = _amCurrentPlyNumber < length _amPositionTreePath
+    notLastPosition = _amCurrentPlyNumber < currentBranchLength
     moveLines = makeHistoryLine <$> if firstMoveColor == White
-        then [0..(length _amPositionTreePath + 1) `div` 2 - 1]
-        else [0..(length _amPositionTreePath + 2) `div` 2 - 1]
+        then [0..(currentBranchLength + 1) `div` 2 - 1]
+        else [0..(currentBranchLength + 2) `div` 2 - 1]
     makeHistoryLine i = hstack
         [ labelS (i+1) `styleBasic` [sizeReqW $ fixedSize 30]
         , hgrid_ [childSpacing_ 4]
             [ if i1 < 1
                 then filler
                 else plyHistoryButton i1 `nodeKey` ("his" <> (showt i1))
-            , if length _amPositionTreePath-i2 < 0
+            , if currentBranchLength-i2 < 0
                 then filler
                 else plyHistoryButton i2 `nodeKey` ("his" <> (showt i2))
             ] `styleBasic` [sizeReqW $ fixedSize 164]
@@ -164,9 +166,47 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , aiPanel aiData
             , separatorLine
+            , label "Analysis graph"
+            , graphWithData_ (graphDataEval <> [currentMoveGraphData])
+                [ lockX
+                , lockY
+                , hideGrid
+                , limitX (-0.02, 0.98)
+                , limitY (-0.171, 0.171)
+                ] `styleBasic`
+                    [ sizeReqH $ fixedSize 128
+                    , bgColor $ rgb 42 34 69
+                    ]
+            , separatorLine
             , uciPanel
             ] `styleBasic` [padding 8]
         ]
+    graphDataEval = _amEvalGroups >>= \evalGroup ->
+        [
+            [ graphPoints evalGroup
+            , graphColor $ if snd (head evalGroup) < 0
+                then black
+                else white
+            , graphFill
+            , graphWidth 0
+            , graphDuration 200
+            ]
+        ,   [ graphPoints $ init evalGroup
+            , graphColor orange
+            , graphWidth 1
+            , graphDuration 200
+            ]
+        ]
+    currentMoveGraphData =
+        [ graphPoints
+            [ (evalStep*(fromIntegral _amCurrentPlyNumber), -0.17)
+            , (evalStep*(fromIntegral _amCurrentPlyNumber), 0.17)
+            ]
+        , graphColor yellow
+        , graphWidth 1
+        , graphDuration 200
+        ]
+    evalStep = 0.96/(fromIntegral currentBranchLength + 0.0001)
     buttonPanel = vstack' $ if _amShowEditMenu
         then
             [ resetTwoBoardsButtons

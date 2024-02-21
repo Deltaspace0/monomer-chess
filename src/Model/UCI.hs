@@ -49,7 +49,7 @@ data UCIEvent
     | EventSetEngineLoading Bool
     | EventSetRequestMVars (Maybe (MVar String, MVar Position))
     | EventSetCurrentDepth (Maybe Text)
-    | EventSetPV [(Text, Maybe Ply)]
+    | EventSetPV [(Text, Maybe Ply, Maybe Double)]
     | EventSetOptionsUCI UCIOptions
     deriving (Eq, Show)
 
@@ -60,7 +60,7 @@ data UCIData = UCIData
     , _uciEngineNodes :: Int
     , _uciEngineDepthOrNodes :: Bool
     , _uciCurrentEngineDepth :: Maybe Text
-    , _uciPrincipalVariations :: [(Text, Maybe Ply)]
+    , _uciPrincipalVariations :: [(Text, Maybe Ply, Maybe Double)]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
     , _uciEngineLogChan :: Maybe (Chan String)
     , _uciOptionsUCI :: UCIOptions
@@ -216,16 +216,17 @@ getUciBestMove uciOutput = ((ws!!) . succ) <$> elemIndex "bestmove" ws where
 getNewPrincipalVariations
     :: Position
     -> String
-    -> [(Text, Maybe Ply)]
-    -> [(Text, Maybe Ply)]
+    -> [(Text, Maybe Ply, Maybe Double)]
+    -> [(Text, Maybe Ply, Maybe Double)]
 getNewPrincipalVariations position uciOutput variations = newVariations where
     newVariations = if "pv" `elem` ws
-        then (variations <> emptyLines) & ix (j-1) .~ (uciInfo, firstPly)
+        then (variations <> emptyLines) & ix (j-1) .~ newVariation
         else variations
-    emptyLines = replicate (j-length variations) ("...", Nothing)
+    emptyLines = replicate (j-length variations) ("...", Nothing, Nothing)
     j = if "multipv" `elem` ws
         then read $ ws!!(fromJust (elemIndex "multipv" ws) + 1)
         else 1
+    newVariation = (uciInfo, firstPly, evalDouble)
     uciInfo
         | correctUci && movesText == "???" = ""
         | correctUci = evaluationText <> " " <> movesText
@@ -239,6 +240,12 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
         "cp" -> (if signCondition then "-" else "+") <> cpNumberText
         "mate" -> (if signCondition then "#-" else "#") <> mateNumberText
         _ -> "???"
+    evalDouble = case evalType of
+        "cp" | signCondition -> Just $ -(abs cpNumber)
+        "cp" -> Just $ abs cpNumber
+        "mate" | signCondition -> Just (-200)
+        "mate" -> Just 200
+        _ -> Nothing
     signCondition = (color position == White) /= (cpNumber > 0)
     mateNumberText = showt $ abs (read evalNumber :: Int)
     cpNumberText = pack $ showFFloat Nothing (abs cpNumber) ""
