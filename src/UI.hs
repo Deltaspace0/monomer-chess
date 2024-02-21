@@ -166,7 +166,10 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , aiPanel aiData
             , separatorLine
-            , label "Analysis graph"
+            , zstack
+                [ label "Analysis graph"
+                , box_ [alignRight] $ button "Update" AppSyncEvalGroups
+                ]
             , graphWithData_ (graphDataEval <> [currentMoveGraphData])
                 [ lockX
                 , lockY

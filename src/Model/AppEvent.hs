@@ -170,7 +170,6 @@ syncBoardHandle model@(AppModel{..}) = response where
             & boardState .~ newState
             & boardStateReversed .~ newStateReversed
             & fenData .~ getFenData _amChessPosition
-        , Event AppSyncEvalGroups
         ]
     (newState, newStateReversed) = getBoardStates _amChessPosition
 
@@ -525,7 +524,6 @@ setPrincipalVariationsHandle v model@(AppModel{..}) = response where
         [ Model $ model
             & positionTree .~ newPositionTree
             & uciData . principalVariations .~ v
-        , Event AppSyncEvalGroups
         ]
     newPositionTree = if null newEval
         then _amPositionTree
