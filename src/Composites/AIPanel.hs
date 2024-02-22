@@ -25,7 +25,8 @@ buildUI _ AIData{..} = tree where
         [ hstack_ [childSpacing_ 16]
             [ label "How to respond:"
             , textDropdownS responseMethod
-                [ RandomResponse
+                [ NoResponse
+                , RandomResponse
                 , UCIResponse
                 , MinimaxResponse
                 , MCTSResponse

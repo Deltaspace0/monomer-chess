@@ -28,13 +28,15 @@ import Model.AI.MCTS
 import Model.AI.Minimax
 
 data ResponseMethod
-    = RandomResponse
+    = NoResponse
+    | RandomResponse
     | MinimaxResponse
     | MCTSResponse
     | UCIResponse
     deriving Eq
 
 instance Show ResponseMethod where
+    show NoResponse = "Do not respond"
     show RandomResponse = "Random moves"
     show MinimaxResponse = "Minimax"
     show MCTSResponse = "Monte Carlo tree search"
@@ -56,7 +58,7 @@ makeLensesWith abbreviatedFields 'AIData
 
 initAI :: AIData
 initAI = AIData
-    { _adResponseMethod = UCIResponse
+    { _adResponseMethod = NoResponse
     , _adUciBestMoveMVar = Nothing
     , _adResetUciBestMove = False
     , _adMctsRuns = 2000
@@ -67,6 +69,7 @@ initAI = AIData
 calculateMove :: Position -> AIData -> IO (Maybe Ply, Maybe Text)
 calculateMove pos AIData{..} = result where
     result = case _adResponseMethod of
+        NoResponse -> pure (Nothing, Nothing)
         RandomResponse -> onlyPly <$> randomMove pos
         MinimaxResponse -> pure (mmPly, Just $ "Evaluation: " <> showt eval)
         MCTSResponse -> onlyPly <$> mctsMove pos _adMctsRuns

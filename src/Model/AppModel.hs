@@ -26,7 +26,6 @@ module Model.AppModel
     , errorMessage
     , autoQueen
     , boardRotated
-    , autoRespond
     , responseThread
     , sanMoves
     , forsythEdwards
@@ -74,7 +73,6 @@ data AppModel = AppModel
     , _amErrorMessage :: Maybe Text
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
-    , _amAutoRespond :: Bool
     , _amResponseThread :: Maybe ThreadId
     , _amSanMoves :: Text
     , _amForsythEdwards :: Text
@@ -105,7 +103,6 @@ initModel = AppModel
     , _amErrorMessage = Nothing
     , _amAutoQueen = False
     , _amBoardRotated = False
-    , _amAutoRespond = True
     , _amResponseThread = Nothing
     , _amSanMoves = ""
     , _amForsythEdwards = pack $ toFEN startpos

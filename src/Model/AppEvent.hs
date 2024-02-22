@@ -203,15 +203,14 @@ boardChangedHandle info@(_, ixTo, ixFrom) model@(AppModel{..})
     | _amAutoQueen =
         [ setNextPly
         , Event AppRunNextPly
-        , responseIf _amAutoRespond $ Event AppPlayNextResponse
+        , Event AppPlayNextResponse
         ]
     | otherwise =
         [ setNextPly
         , Event $ if noPromotion
             then AppRunNextPly
             else AppSetPromotionMenu True
-        , responseIf (_amAutoRespond && noPromotion) $
-            Event AppPlayNextResponse
+        , responseIf noPromotion $ Event AppPlayNextResponse
         ]
     where
         differentBoards = abs (ixTo-ixFrom) > 100
@@ -319,12 +318,12 @@ runNextPlyHandle model@(AppModel{..}) = response where
     ppOld = indexPositionTree model _amCurrentPlyNumber
 
 promoteHandle :: PieceType -> EventHandle
-promoteHandle pieceType model@(AppModel{..}) = response where
+promoteHandle pieceType model = response where
     response =
         [ Model $ model & nextPly %~ ((`promoteTo` pieceType) <$>)
         , Event $ AppSetPromotionMenu False
         , Event AppRunNextPly
-        , responseIf _amAutoRespond $ Event AppPlayNextResponse
+        , Event AppPlayNextResponse
         ]
 
 setUciBestMoveMVarHandle :: Maybe (MVar String, MVar ()) -> EventHandle

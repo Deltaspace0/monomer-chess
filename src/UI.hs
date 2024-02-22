@@ -162,7 +162,6 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , labeledCheckbox' "Rotate board" boardRotated
             , labeledCheckbox' "Auto promote to queen" autoQueen
-            , labeledCheckbox' "Auto respond" autoRespond
             , separatorLine
             , aiPanel aiData
             , separatorLine
