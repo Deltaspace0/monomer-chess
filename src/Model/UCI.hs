@@ -7,6 +7,7 @@ module Model.UCI
     ( module Model.UCIOptions
     , UCIEvent(..)
     , UCIData(..)
+    , engineIndex
     , enginePath
     , engineLoading
     , engineDepth
@@ -54,7 +55,8 @@ data UCIEvent
     deriving (Eq, Show)
 
 data UCIData = UCIData
-    { _uciEnginePath :: Text
+    { _uciEngineIndex :: Int
+    , _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
     , _uciEngineNodes :: Int
@@ -76,7 +78,8 @@ makeLensesWith abbreviatedFields 'UCIData
 
 defaultUciData :: UCIData
 defaultUciData = UCIData
-    { _uciEnginePath = ""
+    { _uciEngineIndex = 0
+    , _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
     , _uciEngineNodes = 500000
@@ -107,6 +110,8 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
     reportError = raiseEvent . EventReportError
     logChan = fromJust _uciEngineLogChan
     logsEnabled = isJust _uciEngineLogChan
+    inPrefix = "stdin" <> (show _uciEngineIndex) <> ": "
+    outPrefix = "stdout" <> (show _uciEngineIndex) <> ": "
     uciTalk (Just hin, Just hout, Just herr, processHandle) = do
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar
@@ -116,10 +121,10 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         optRef <- newIORef []
         let putLine x = do
                 hPutStrLn hin x
-                when logsEnabled $ writeChan logChan $ "stdin: " <> x
+                when logsEnabled $ writeChan logChan $ inPrefix <> x
             outGetLine = do
                 x <- hGetLine hout
-                when logsEnabled $ writeChan logChan $ "stdout: " <> x
+                when logsEnabled $ writeChan logChan $ outPrefix <> x
                 return x
             setCurrentDepth x = do
                 writeIORef depthRef x

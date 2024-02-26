@@ -54,17 +54,18 @@ data AppEvent
     | AppClearEditBoard
     | AppUpdateFEN
     | AppLoadEngine
-    | AppSetEngineLoading Bool
-    | AppSetRequestMVars (Maybe (MVar String, MVar Position))
+    | AppSetEngineLoading Int Bool
+    | AppSetRequestMVars Int (Maybe (MVar String, MVar Position))
     | AppSetEngineLogChan (Maybe (Chan String))
-    | AppSetCurrentEngineDepth (Maybe Text)
-    | AppSetPrincipalVariations [(Text, Maybe Ply, Maybe Double)]
-    | AppSetOptionsUCI UCIOptions
+    | AppSetCurrentEngineDepth Int (Maybe Text)
+    | AppSetPrincipalVariations Int [(Text, Maybe Ply, Maybe Double)]
+    | AppSetOptionsUCI Int UCIOptions
     | AppRunAnalysis
     | AppSendEngineRequest String
     | AppSetUciLogs Text
     | AppClearUciLogs
     | AppRecordUCILogsChanged Bool
+    | AppUciNewSlot
     | AppSetTablebaseData TablebaseData
     deriving (Eq, Show)
 
@@ -104,17 +105,18 @@ handleEvent _ _ model event = case event of
     AppClearEditBoard -> clearEditBoardHandle model
     AppUpdateFEN -> updateFenHandle model
     AppLoadEngine -> loadEngineHandle model
-    AppSetEngineLoading v -> setEngineLoadingHandle v model
-    AppSetRequestMVars v -> setRequestMVarsHandle v model
+    AppSetEngineLoading i v -> setEngineLoadingHandle i v model
+    AppSetRequestMVars i v -> setRequestMVarsHandle i v model
     AppSetEngineLogChan v -> setEngineLogChanHandle v model
-    AppSetCurrentEngineDepth v -> setCurrentEngineDepthHandle v model
-    AppSetPrincipalVariations v -> setPrincipalVariationsHandle v model
-    AppSetOptionsUCI v -> setOptionsUCIHandle v model
+    AppSetCurrentEngineDepth i v -> setCurrentEngineDepthHandle i v model
+    AppSetPrincipalVariations i v -> setPrincipalVariationsHandle i v model
+    AppSetOptionsUCI i v -> setOptionsUCIHandle i v model
     AppRunAnalysis -> runAnalysisHandle model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
     AppSetUciLogs v -> setUciLogsHandle v model
     AppClearUciLogs -> clearUciLogsHandle model
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
+    AppUciNewSlot -> uciNewSlotHandle model
     AppSetTablebaseData v -> setTablebaseDataHandle v model
 
 initHandle :: EventHandle
@@ -355,7 +357,7 @@ playNextResponseHandle AppModel{..} = response where
         raiseEvent $ AppSetResponseThread $ Just thread
         takeMVar mvar
     AIData{..} = _amAiData
-    UCIData{..} = _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
 
 abortNextResponseHandle :: EventHandle
 abortNextResponseHandle model@(AppModel{..}) =
@@ -491,38 +493,43 @@ updateFenHandle model@(AppModel{..}) = response where
 
 loadEngineHandle :: EventHandle
 loadEngineHandle AppModel{..} = [Producer producerHandler] where
-    producerHandler raiseEvent = loadUciEngine _amUciData $ f raiseEvent
-    f raiseEvent event = raiseEvent $ case event of
+    producerHandler raise = loadUciEngine (_amUciData!!_amUciIndex) $ f raise
+    f raise event = raise $ case event of
         EventReportError v -> AppSetErrorMessage $ Just v
-        EventSetEngineLoading v -> AppSetEngineLoading v
-        EventSetRequestMVars v -> AppSetRequestMVars v
-        EventSetCurrentDepth v -> AppSetCurrentEngineDepth v
-        EventSetPV v -> AppSetPrincipalVariations v
-        EventSetOptionsUCI v -> AppSetOptionsUCI v
+        EventSetEngineLoading v -> AppSetEngineLoading _amUciIndex v
+        EventSetRequestMVars v -> AppSetRequestMVars _amUciIndex v
+        EventSetCurrentDepth v -> AppSetCurrentEngineDepth _amUciIndex v
+        EventSetPV v -> AppSetPrincipalVariations _amUciIndex v
+        EventSetOptionsUCI v -> AppSetOptionsUCI _amUciIndex v
 
-setEngineLoadingHandle :: Bool -> EventHandle
-setEngineLoadingHandle v model = response where
-    response = [Model $ model & uciData . engineLoading .~ v]
+setEngineLoadingHandle :: Int -> Bool -> EventHandle
+setEngineLoadingHandle i v model = response where
+    response = [Model $ model & uciData . ix i . engineLoading .~ v]
 
-setRequestMVarsHandle :: Maybe (MVar String, MVar Position) -> EventHandle
-setRequestMVarsHandle v model = [Model $ model & uciData . requestMVars .~ v]
+setRequestMVarsHandle
+    :: Int
+    -> Maybe (MVar String, MVar Position)
+    -> EventHandle
+setRequestMVarsHandle i v model = response where
+    response = [Model $ model & uciData . ix i . requestMVars .~ v]
 
 setEngineLogChanHandle :: Maybe (Chan String) -> EventHandle
 setEngineLogChanHandle v model = response where
-    response = [Model $ model & uciData . engineLogChan .~ v]
+    response = [Model $ model & uciData %~ map (engineLogChan .~ v)]
 
-setCurrentEngineDepthHandle :: Maybe Text -> EventHandle
-setCurrentEngineDepthHandle v model = response where
-    response = [Model $ model & uciData . currentEngineDepth .~ v]
+setCurrentEngineDepthHandle :: Int -> Maybe Text -> EventHandle
+setCurrentEngineDepthHandle i v model = response where
+    response = [Model $ model & uciData . ix i . currentEngineDepth .~ v]
 
 setPrincipalVariationsHandle
-    :: [(Text, Maybe Ply, Maybe Double)]
+    :: Int
+    -> [(Text, Maybe Ply, Maybe Double)]
     -> EventHandle
-setPrincipalVariationsHandle v model@(AppModel{..}) = response where
+setPrincipalVariationsHandle i v model@(AppModel{..}) = response where
     response =
         [ Model $ model
             & positionTree .~ newPositionTree
-            & uciData . principalVariations .~ v
+            & uciData . ix i . principalVariations .~ v
         ]
     newPositionTree = if null newEval
         then _amPositionTree
@@ -535,8 +542,9 @@ setPrincipalVariationsHandle v model@(AppModel{..}) = response where
     Node dummyValue _ = _amPositionTree
     newEval = listToMaybe v >>= \(_, _, x) -> x
 
-setOptionsUCIHandle :: UCIOptions -> EventHandle
-setOptionsUCIHandle v model = [Model $ model & uciData . optionsUCI .~ v]
+setOptionsUCIHandle :: Int -> UCIOptions -> EventHandle
+setOptionsUCIHandle i v model = response where
+    response = [Model $ model & uciData . ix i . optionsUCI .~ v]
 
 runAnalysisHandle :: EventHandle
 runAnalysisHandle model@(AppModel{..}) = response where
@@ -559,9 +567,10 @@ runAnalysisHandle model@(AppModel{..}) = response where
             _ <- tryTakeMVar bestMoveVar
             _ <- tryTakeMVar bestSyncVar
             putMVar bestSyncVar ()
-        uciRequestAnalysis _amUciData initPos pos $ _ppUciMoves currentPP
+        uciRequestAnalysis (_amUciData!!_amUciIndex) initPos pos uciMoves
     pos = _ppPosition currentPP
     initPos = _ppPosition $ indexPositionTree model 0
+    uciMoves = _ppUciMoves currentPP
     currentPP = indexPositionTree model _amCurrentPlyNumber
     AIData{..} = _amAiData
 
@@ -569,7 +578,7 @@ sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where
     producerHandler _ = maybe (pure ()) sendRequest _uciRequestMVars
     sendRequest = flip putMVar v . fst
-    UCIData{..} = _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
 
 setUciLogsHandle :: Text -> EventHandle
 setUciLogsHandle v model = [Model $ model & uciLogs .~ v]
@@ -582,13 +591,25 @@ clearUciLogsHandle model@(AppModel{..}) = response where
         ]
     producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
     msg = "monomer-clear-uci-logs"
-    UCIData{..} = _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
 
 recordUCILogsChangedHandle :: Bool -> EventHandle
 recordUCILogsChangedHandle v AppModel{..} = [Producer producerHandler] where
     producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
     msg = "monomer-record-uci-" <> (show v)
-    UCIData{..} = _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
+
+uciNewSlotHandle :: EventHandle
+uciNewSlotHandle model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & uciData <>~ [newUciData]
+            & uciIndex .~ newEngineIndex
+        ]
+    newUciData = defaultUciData
+        & engineIndex .~ newEngineIndex
+        & engineLogChan .~ _uciEngineLogChan (head _amUciData)
+    newEngineIndex = length _amUciData
 
 setTablebaseDataHandle :: TablebaseData -> EventHandle
 setTablebaseDataHandle v model = [Model $ model & tablebaseData .~ v]

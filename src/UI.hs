@@ -1,10 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module UI
     ( buildUI
     ) where
 
+import Control.Lens
 import Data.Maybe
 import Data.Tree (Tree(..))
 import Game.Chess
@@ -237,6 +239,7 @@ buildUI _ model@(AppModel{..}) = tree where
             `nodeEnabled` not calculatingResponse
         , toggleButton "Two boards" showTwoBoards
         ]
+    calculatingResponse = isJust _amResponseThread
     promAlert = alert (AppSetPromotionMenu False) $ vstack'
         [ label "Promote to:"
         , checkerboard 2 2 promotionPieces `styleBasic`
@@ -316,10 +319,18 @@ buildUI _ model@(AppModel{..}) = tree where
             `nodeEnabled` not calculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
     uciPanel = vstack_ [childSpacing_ 16]
-        [ label "UCI engine settings"
+        [ zstack
+            [ label "UCI engine settings"
+            , box_ [alignRight] $ hstack'
+                [ textDropdown_ uciIndex [0..length _amUciData-1]
+                    (("UCI" <>) . showt) [] `styleBasic`
+                        [sizeReqW $ fixedSize 128]
+                , button "New slot" AppUciNewSlot
+                ]
+            ]
         , hstack_ [childSpacing_ 16]
             [ label "Path: "
-            , textField $ uciData . enginePath
+            , textField $ uciData' . enginePath
             , if _uciEngineLoading
                 then button "Wait" AppLoadEngine `nodeEnabled` False
                 else button "Load" AppLoadEngine
@@ -345,20 +356,23 @@ buildUI _ model@(AppModel{..}) = tree where
         , separatorLine
         , hgrid'
             [ labeledRadio_ ("Engine depth: " <> (showt _uciEngineDepth))
-                True (uciData . engineDepthOrNodes) [textRight]
-            , hslider_ (uciData . engineDepth) 1 100 [dragRate 1]
+                True (uciData' . engineDepthOrNodes) [textRight]
+            , hslider_ (uciData' . engineDepth) 1 100 [dragRate 1]
             ]
         , hgrid'
             [ labeledRadio_ "Engine nodes:" False
-                (uciData . engineDepthOrNodes) [textRight]
-            , numericField $ uciData . engineNodes
+                (uciData' . engineDepthOrNodes) [textRight]
+            , numericField $ uciData' . engineNodes
             ]
         , separatorLine
         , label "UCI options"
         , if null _uciRequestMVars
             then label "Not available (UCI is not loaded)"
-            else uciOptionsPanel (uciData . optionsUCI) $
+            else uciOptionsPanel (uciData' . optionsUCI) $
                 fst $ fromJust _uciRequestMVars
         ]
-    UCIData{..} = _amUciData
-    calculatingResponse = isJust _amResponseThread
+    uciData' :: Lens' AppModel UCIData
+    uciData' = uciData . ixl _amUciIndex
+    ixl :: Int -> Lens' [UCIData] UCIData
+    ixl i = lens (!!i) (\x v -> x & ix i .~ v)
+    UCIData{..} = _amUciData!!_amUciIndex

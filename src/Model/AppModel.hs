@@ -32,6 +32,7 @@ module Model.AppModel
     , fenData
     , aiData
     , uciData
+    , uciIndex
     , uciLogs
     , uciRecordLogs
     , initModel
@@ -78,7 +79,8 @@ data AppModel = AppModel
     , _amForsythEdwards :: Text
     , _amFenData :: FENData
     , _amAiData :: AIData
-    , _amUciData :: UCIData
+    , _amUciData :: [UCIData]
+    , _amUciIndex :: Int
     , _amUciLogs :: Text
     , _amUciRecordLogs :: Bool
     } deriving (Eq, Show)
@@ -108,7 +110,8 @@ initModel = AppModel
     , _amForsythEdwards = pack $ toFEN startpos
     , _amFenData = getFenData startpos
     , _amAiData = initAI
-    , _amUciData = defaultUciData
+    , _amUciData = [defaultUciData]
+    , _amUciIndex = 0
     , _amUciLogs = ""
     , _amUciRecordLogs = False
     } where
