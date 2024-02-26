@@ -167,7 +167,7 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , zstack
                 [ label "Analysis graph"
-                , box_ [alignRight] $ button "Update" AppSyncEvalGroups
+                , box_ [alignRight] $ button "Refresh" AppSyncEvalGroups
                 ]
             , graphWithData_ (graphDataEval <> [currentMoveGraphData])
                 [ lockX
