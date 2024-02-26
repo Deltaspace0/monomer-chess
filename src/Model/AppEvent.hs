@@ -56,7 +56,7 @@ data AppEvent
     | AppLoadEngine
     | AppSetEngineLoading Int Bool
     | AppSetRequestMVars Int (Maybe (MVar String, MVar Position))
-    | AppSetEngineLogChan (Maybe (Chan String))
+    | AppSetEngineLogChan (Maybe (Chan UCILog))
     | AppSetCurrentEngineDepth Int (Maybe Text)
     | AppSetPrincipalVariations Int [(Text, Maybe Ply, Maybe Double)]
     | AppSetOptionsUCI Int UCIOptions
@@ -134,21 +134,24 @@ initHandle _ = [Producer producerHandler] where
         _ <- forkIO $ forever $ do
             threadDelay 500000
             readIORef logsRef >>= raiseEvent . AppSetUciLogs
-        forever $ readChan logChan >>= \x -> case x of
-            "monomer-record-uci-True" -> writeIORef recordRef True
-            "monomer-record-uci-False" -> writeIORef recordRef False
-            "monomer-clear-uci-logs" -> do
-                writeIORef logsListRef []
-                writeIORef logsRef ""
-            _ -> do
-                let uciBestMove = getUciBestMove x
-                when (isJust uciBestMove) $ do
-                    _ <- tryTakeMVar bestMoveVar
-                    putMVar bestMoveVar $ fromJust uciBestMove
+        let recordLog x = do
                 doRecord <- readIORef recordRef
                 when doRecord $ appendFile "logs_uci/outputs.txt" $ x <> "\n"
                 modifyIORef logsListRef $ take 32 . (x:)
                 readIORef logsListRef >>= writeIORef logsRef . pack . unlines
+        forever $ readChan logChan >>= \msg -> case msg of
+            LogDoRecord v -> writeIORef recordRef v
+            LogClear -> do
+                writeIORef logsListRef []
+                writeIORef logsRef ""
+            LogInput i x -> recordLog $ "stdin" <> (show i) <> ": " <> x
+            LogError i x -> recordLog $ "stderr" <> (show i) <> ": " <> x
+            LogOutput i x -> do
+                let uciBestMove = getUciBestMove x
+                when (isJust uciBestMove) $ do
+                    _ <- tryTakeMVar bestMoveVar
+                    putMVar bestMoveVar $ fromJust uciBestMove
+                recordLog $ "stdout" <> (show i) <> ": " <> x
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -513,7 +516,7 @@ setRequestMVarsHandle
 setRequestMVarsHandle i v model = response where
     response = [Model $ model & uciData . ix i . requestMVars .~ v]
 
-setEngineLogChanHandle :: Maybe (Chan String) -> EventHandle
+setEngineLogChanHandle :: Maybe (Chan UCILog) -> EventHandle
 setEngineLogChanHandle v model = response where
     response = [Model $ model & uciData %~ map (engineLogChan .~ v)]
 
@@ -589,14 +592,14 @@ clearUciLogsHandle model@(AppModel{..}) = response where
         [ Producer producerHandler
         , Model $ model & uciLogs .~ ""
         ]
-    producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
-    msg = "monomer-clear-uci-logs"
+    producerHandler _ = maybe (pure ()) f _uciEngineLogChan
+    f = flip writeChan LogClear
     UCIData{..} = _amUciData!!_amUciIndex
 
 recordUCILogsChangedHandle :: Bool -> EventHandle
 recordUCILogsChangedHandle v AppModel{..} = [Producer producerHandler] where
-    producerHandler _ = maybe (pure ()) (flip writeChan msg) _uciEngineLogChan
-    msg = "monomer-record-uci-" <> (show v)
+    producerHandler _ = maybe (pure ()) f _uciEngineLogChan
+    f = flip writeChan $ LogDoRecord v
     UCIData{..} = _amUciData!!_amUciIndex
 
 uciNewSlotHandle :: EventHandle

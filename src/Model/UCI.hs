@@ -5,6 +5,7 @@
 
 module Model.UCI
     ( module Model.UCIOptions
+    , UCILog(..)
     , UCIEvent(..)
     , UCIData(..)
     , engineIndex
@@ -45,6 +46,14 @@ import TextShow
 
 import Model.UCIOptions
 
+data UCILog
+    = LogInput Int String
+    | LogOutput Int String
+    | LogError Int String
+    | LogDoRecord Bool
+    | LogClear
+    deriving (Eq, Show)
+
 data UCIEvent
     = EventReportError Text
     | EventSetEngineLoading Bool
@@ -64,7 +73,7 @@ data UCIData = UCIData
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [(Text, Maybe Ply, Maybe Double)]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
-    , _uciEngineLogChan :: Maybe (Chan String)
+    , _uciEngineLogChan :: Maybe (Chan UCILog)
     , _uciOptionsUCI :: UCIOptions
     } deriving (Eq, Show)
 
@@ -110,8 +119,6 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
     reportError = raiseEvent . EventReportError
     logChan = fromJust _uciEngineLogChan
     logsEnabled = isJust _uciEngineLogChan
-    inPrefix = "stdin" <> (show _uciEngineIndex) <> ": "
-    outPrefix = "stdout" <> (show _uciEngineIndex) <> ": "
     uciTalk (Just hin, Just hout, Just herr, processHandle) = do
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar
@@ -121,10 +128,12 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         optRef <- newIORef []
         let putLine x = do
                 hPutStrLn hin x
-                when logsEnabled $ writeChan logChan $ inPrefix <> x
+                let msg = LogInput _uciEngineIndex x
+                when logsEnabled $ writeChan logChan msg
             outGetLine = do
                 x <- hGetLine hout
-                when logsEnabled $ writeChan logChan $ outPrefix <> x
+                let msg = LogOutput _uciEngineIndex x
+                when logsEnabled $ writeChan logChan msg
                 return x
             setCurrentDepth x = do
                 writeIORef depthRef x
@@ -135,7 +144,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
             readNotEOF f = hIsEOF hout >>= flip unless (outGetLine >>= f)
             readErrEOF f = hIsEOF herr >>= flip unless (hGetLine herr >>= f)
             logErrorOutput = readErrEOF $ \x -> do
-                writeChan logChan $ "stderr: " <> x
+                writeChan logChan $ LogError _uciEngineIndex x
                 logErrorOutput
             waitForUciOk = readNotEOF $ \x -> do
                 let opt = parseUciOption x
