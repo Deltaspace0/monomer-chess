@@ -323,7 +323,7 @@ buildUI _ model@(AppModel{..}) = tree where
             [ label "UCI engine settings"
             , box_ [alignRight] $ hstack'
                 [ textDropdown_ uciIndex [0..length _amUciData-1]
-                    (("UCI" <>) . showt) [] `styleBasic`
+                    (("UCI" <>) . showt) [onChange uciIndexEvent] `styleBasic`
                         [sizeReqW $ fixedSize 128]
                 , button "New slot" AppUciNewSlot
                 ]
@@ -371,6 +371,8 @@ buildUI _ model@(AppModel{..}) = tree where
             else uciOptionsPanel (uciData' . optionsUCI) $
                 fst $ fromJust _uciRequestMVars
         ]
+    uciIndexEvent :: Int -> AppEvent
+    uciIndexEvent _ = AppRunAnalysis
     uciData' :: Lens' AppModel UCIData
     uciData' = uciData . ixl _amUciIndex
     ixl :: Int -> Lens' [UCIData] UCIData
