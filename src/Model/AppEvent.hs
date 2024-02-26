@@ -534,7 +534,7 @@ setPrincipalVariationsHandle i v model@(AppModel{..}) = response where
             & positionTree .~ newPositionTree
             & uciData . ix i . principalVariations .~ v
         ]
-    newPositionTree = if null newEval
+    newPositionTree = if null newEval || i /= _amUciIndex
         then _amPositionTree
         else head offsetChildNodes
     Node _ offsetChildNodes = fst $ insertTree cutOffPath pp offsetTree
