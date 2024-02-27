@@ -369,13 +369,20 @@ abortNextResponseHandle model@(AppModel{..}) =
     ]
 
 responseCalculatedHandle :: (Maybe Ply, Maybe Text) -> EventHandle
-responseCalculatedHandle (responsePly, message) model =
-    [ Model $ model
-        & nextPly .~ responsePly
-        & responseThread .~ Nothing
-        & aiData . aiMessage .~ message
-    , Event AppRunNextPly
-    ]
+responseCalculatedHandle (ply, message) model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & nextPly .~ ply
+            & responseThread .~ Nothing
+            & aiData . aiMessage .~ message
+            & uciIndex .~ newEngineIndex
+        , Event AppRunNextPly
+        ]
+    newEngineIndex = if _adResponseMethod == UCIResponse && isJust ply
+        then _uciEngineNextIndex
+        else _amUciIndex
+    AIData{..} = _amAiData
+    UCIData{..} = _amUciData!!_amUciIndex
 
 setResponseThreadHandle :: Maybe ThreadId -> EventHandle
 setResponseThreadHandle v model = [Model $ model & responseThread .~ v]
@@ -611,6 +618,7 @@ uciNewSlotHandle model@(AppModel{..}) = response where
         ]
     newUciData = defaultUciData
         & engineIndex .~ newEngineIndex
+        & engineNextIndex .~ newEngineIndex
         & engineLogChan .~ _uciEngineLogChan (head _amUciData)
     newEngineIndex = length _amUciData
 

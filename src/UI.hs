@@ -166,6 +166,11 @@ buildUI _ model@(AppModel{..}) = tree where
             , labeledCheckbox' "Auto promote to queen" autoQueen
             , separatorLine
             , aiPanel aiData
+            , widgetIf (_adResponseMethod == UCIResponse) $ hstack'
+                [ label "After response switch to"
+                , textDropdown_ (uciData' . engineNextIndex)
+                    [0..length _amUciData-1] (("UCI" <>) . showt) []
+                ]
             , separatorLine
             , zstack
                 [ label "Analysis graph"
@@ -377,4 +382,5 @@ buildUI _ model@(AppModel{..}) = tree where
     uciData' = uciData . ixl _amUciIndex
     ixl :: Int -> Lens' [UCIData] UCIData
     ixl i = lens (!!i) (\x v -> x & ix i .~ v)
+    AIData{..} = _amAiData
     UCIData{..} = _amUciData!!_amUciIndex

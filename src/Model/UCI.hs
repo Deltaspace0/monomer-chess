@@ -9,6 +9,7 @@ module Model.UCI
     , UCIEvent(..)
     , UCIData(..)
     , engineIndex
+    , engineNextIndex
     , enginePath
     , engineLoading
     , engineDepth
@@ -65,6 +66,7 @@ data UCIEvent
 
 data UCIData = UCIData
     { _uciEngineIndex :: Int
+    , _uciEngineNextIndex :: Int
     , _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
@@ -88,6 +90,7 @@ makeLensesWith abbreviatedFields 'UCIData
 defaultUciData :: UCIData
 defaultUciData = UCIData
     { _uciEngineIndex = 0
+    , _uciEngineNextIndex = 0
     , _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
