@@ -18,6 +18,7 @@ module Model.UCI
     , currentEngineDepth
     , principalVariations
     , requestMVars
+    , bestMoveMVars
     , engineLogChan
     , optionsUCI
     , defaultUciData
@@ -59,6 +60,7 @@ data UCIEvent
     = EventReportError Text
     | EventSetEngineLoading Bool
     | EventSetRequestMVars (Maybe (MVar String, MVar Position))
+    | EventSetBestMoveMVars (Maybe (MVar String, MVar ()))
     | EventSetCurrentDepth (Maybe Text)
     | EventSetPV [(Text, Maybe Ply, Maybe Double)]
     | EventSetOptionsUCI UCIOptions
@@ -75,6 +77,7 @@ data UCIData = UCIData
     , _uciCurrentEngineDepth :: Maybe Text
     , _uciPrincipalVariations :: [(Text, Maybe Ply, Maybe Double)]
     , _uciRequestMVars :: Maybe (MVar String, MVar Position)
+    , _uciBestMoveMVars :: Maybe (MVar String, MVar ())
     , _uciEngineLogChan :: Maybe (Chan UCILog)
     , _uciOptionsUCI :: UCIOptions
     } deriving (Eq, Show)
@@ -99,6 +102,7 @@ defaultUciData = UCIData
     , _uciCurrentEngineDepth = Nothing
     , _uciPrincipalVariations = []
     , _uciRequestMVars = Nothing
+    , _uciBestMoveMVars = Nothing
     , _uciEngineLogChan = Nothing
     , _uciOptionsUCI = initUciOptions []
     }
@@ -126,10 +130,13 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
         mvar <- newEmptyMVar
         rvar <- newEmptyMVar
         pvar <- newEmptyMVar
+        bestMoveVar <- newEmptyMVar
+        bestSyncVar <- newEmptyMVar
         depthRef <- newIORef Nothing
         pvRef <- newIORef []
         optRef <- newIORef []
-        let putLine x = do
+        let bestVars = (bestMoveVar, bestSyncVar)
+            putLine x = do
                 hPutStrLn hin x
                 let msg = LogInput _uciEngineIndex x
                 when logsEnabled $ writeChan logChan msg
@@ -159,11 +166,16 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
             uciOutputLoop = hIsEOF hout >>= \eof -> if eof
                 then do
                     raiseEvent $ EventSetRequestMVars Nothing
+                    raiseEvent $ EventSetBestMoveMVars Nothing
                     putMVar rvar "eof"
                 else do
                     x <- outGetLine
                     pos <- readMVar pvar
                     let getNewPV = getNewPrincipalVariations pos
+                        uciBestMove = getUciBestMove x
+                    when (isJust uciBestMove) $ do
+                        _ <- tryTakeMVar bestMoveVar
+                        putMVar bestMoveVar $ fromJust uciBestMove
                     atomicModifyIORef depthRef $ \v -> (getUciDepth x v, ())
                     atomicModifyIORef pvRef $ \v -> (getNewPV x v, ())
                     uciOutputLoop
@@ -193,6 +205,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 reportThread <- forkIO uciReportLoop
                 opts <- initUciOptions . reorderUciOpts <$> readIORef optRef
                 raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
+                raiseEvent $ EventSetBestMoveMVars $ Just bestVars
                 raiseEvent $ EventSetOptionsUCI opts
                 uciRequestLoop
                 terminateProcess processHandle
@@ -200,6 +213,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 raiseEvent $ EventSetCurrentDepth Nothing
                 raiseEvent $ EventSetPV []
                 raiseEvent $ EventSetRequestMVars Nothing
+                raiseEvent $ EventSetBestMoveMVars Nothing
     uciTalk _ = reportError "Some IO handles were Nothing"
 
 reorderUciOpts :: [OptionUCI] -> [OptionUCI]

@@ -38,7 +38,6 @@ data AppEvent
     | AppDoPly (Maybe Ply)
     | AppRunNextPly
     | AppPromote PieceType
-    | AppSetUciBestMoveMVar (Maybe (MVar String, MVar ()))
     | AppSetResetUciBestMove Bool
     | AppPlayNextResponse
     | AppAbortNextResponse
@@ -56,6 +55,7 @@ data AppEvent
     | AppLoadEngine
     | AppSetEngineLoading Int Bool
     | AppSetRequestMVars Int (Maybe (MVar String, MVar Position))
+    | AppSetBestMoveMVars Int (Maybe (MVar String, MVar ()))
     | AppSetEngineLogChan (Maybe (Chan UCILog))
     | AppSetCurrentEngineDepth Int (Maybe Text)
     | AppSetPrincipalVariations Int [(Text, Maybe Ply, Maybe Double)]
@@ -89,7 +89,6 @@ handleEvent _ _ model event = case event of
     AppDoPly v -> doPlyHandle v model
     AppRunNextPly -> runNextPlyHandle model
     AppPromote pieceType -> promoteHandle pieceType model
-    AppSetUciBestMoveMVar v -> setUciBestMoveMVarHandle v model
     AppSetResetUciBestMove v -> setResetUciBestMoveHandle v model
     AppPlayNextResponse -> playNextResponseHandle model
     AppAbortNextResponse -> abortNextResponseHandle model
@@ -107,6 +106,7 @@ handleEvent _ _ model event = case event of
     AppLoadEngine -> loadEngineHandle model
     AppSetEngineLoading i v -> setEngineLoadingHandle i v model
     AppSetRequestMVars i v -> setRequestMVarsHandle i v model
+    AppSetBestMoveMVars i v -> setBestMoveMVarsHandle i v model
     AppSetEngineLogChan v -> setEngineLogChanHandle v model
     AppSetCurrentEngineDepth i v -> setCurrentEngineDepthHandle i v model
     AppSetPrincipalVariations i v -> setPrincipalVariationsHandle i v model
@@ -124,17 +124,15 @@ initHandle _ = [Producer producerHandler] where
     producerHandler raiseEvent = do
         createDirectoryIfMissing True "logs_uci"
         logChan <- newChan
-        bestMoveVar <- newEmptyMVar
-        bestSyncVar <- newEmptyMVar
-        raiseEvent $ AppSetEngineLogChan $ Just logChan
-        raiseEvent $ AppSetUciBestMoveMVar $ Just (bestMoveVar, bestSyncVar)
         logsListRef <- newIORef []
         logsRef <- newIORef ""
         recordRef <- newIORef False
+        raiseEvent $ AppSetEngineLogChan $ Just logChan
         _ <- forkIO $ forever $ do
             threadDelay 500000
             readIORef logsRef >>= raiseEvent . AppSetUciLogs
-        let recordLog x = do
+        let recordLog prefix i logString = do
+                let x = prefix <> (show i) <> ": " <> logString
                 doRecord <- readIORef recordRef
                 when doRecord $ appendFile "logs_uci/outputs.txt" $ x <> "\n"
                 modifyIORef logsListRef $ take 32 . (x:)
@@ -144,14 +142,9 @@ initHandle _ = [Producer producerHandler] where
             LogClear -> do
                 writeIORef logsListRef []
                 writeIORef logsRef ""
-            LogInput i x -> recordLog $ "stdin" <> (show i) <> ": " <> x
-            LogError i x -> recordLog $ "stderr" <> (show i) <> ": " <> x
-            LogOutput i x -> do
-                let uciBestMove = getUciBestMove x
-                when (isJust uciBestMove) $ do
-                    _ <- tryTakeMVar bestMoveVar
-                    putMVar bestMoveVar $ fromJust uciBestMove
-                recordLog $ "stdout" <> (show i) <> ": " <> x
+            LogInput i x -> recordLog "stdin" i x
+            LogError i x -> recordLog "stderr" i x
+            LogOutput i x -> recordLog "stdout" i x
 
 setPositionHandle :: Position -> EventHandle
 setPositionHandle position model =
@@ -331,10 +324,6 @@ promoteHandle pieceType model = response where
         , Event AppPlayNextResponse
         ]
 
-setUciBestMoveMVarHandle :: Maybe (MVar String, MVar ()) -> EventHandle
-setUciBestMoveMVarHandle v model = response where
-    response = [Model $ model & aiData . uciBestMoveMVar .~ v]
-
 setResetUciBestMoveHandle :: Bool -> EventHandle
 setResetUciBestMoveHandle v model = response where
     response = [Model $ model & aiData . resetUciBestMove .~ v]
@@ -343,17 +332,15 @@ playNextResponseHandle :: EventHandle
 playNextResponseHandle AppModel{..} = response where
     response = [Producer producerHandler]
     producerHandler raiseEvent = do
-        let (bestMoveVar, bestSyncVar) = fromJust _adUciBestMoveMVar
-        when (isJust _adUciBestMoveMVar) $ do
-            when _adResetUciBestMove $ do
-                takeMVar bestSyncVar
-                raiseEvent $ AppSetResetUciBestMove False
-            when (null _uciRequestMVars) $ do
-                _ <- tryTakeMVar bestMoveVar
-                putMVar bestMoveVar "nouci"
+        let bestSyncVar = snd $ fromJust _uciBestMoveMVars
+        when (isJust _uciBestMoveMVars && _adResetUciBestMove) $ do
+            takeMVar bestSyncVar
+            raiseEvent $ AppSetResetUciBestMove False
         mvar <- newEmptyMVar
         thread <- forkIO $ do
-            result <- calculateMove _amChessPosition _amAiData
+            result <- calculateMove _amChessPosition $ _amAiData
+                { _adUciBestMoveMVar = fst <$> _uciBestMoveMVars
+                }
             result `deepseq` pure ()
             raiseEvent $ AppResponseCalculated result
             putMVar mvar ()
@@ -503,14 +490,16 @@ updateFenHandle model@(AppModel{..}) = response where
 
 loadEngineHandle :: EventHandle
 loadEngineHandle AppModel{..} = [Producer producerHandler] where
-    producerHandler raise = loadUciEngine (_amUciData!!_amUciIndex) $ f raise
-    f raise event = raise $ case event of
+    producerHandler raiseEvent = loadUciEngine currentUciData $ f raiseEvent
+    f raiseEvent event = raiseEvent $ case event of
         EventReportError v -> AppSetErrorMessage $ Just v
         EventSetEngineLoading v -> AppSetEngineLoading _amUciIndex v
         EventSetRequestMVars v -> AppSetRequestMVars _amUciIndex v
+        EventSetBestMoveMVars v -> AppSetBestMoveMVars _amUciIndex v
         EventSetCurrentDepth v -> AppSetCurrentEngineDepth _amUciIndex v
         EventSetPV v -> AppSetPrincipalVariations _amUciIndex v
         EventSetOptionsUCI v -> AppSetOptionsUCI _amUciIndex v
+    currentUciData = _amUciData!!_amUciIndex
 
 setEngineLoadingHandle :: Int -> Bool -> EventHandle
 setEngineLoadingHandle i v model = response where
@@ -522,6 +511,10 @@ setRequestMVarsHandle
     -> EventHandle
 setRequestMVarsHandle i v model = response where
     response = [Model $ model & uciData . ix i . requestMVars .~ v]
+
+setBestMoveMVarsHandle :: Int -> Maybe (MVar String, MVar ()) -> EventHandle
+setBestMoveMVarsHandle i v model = response where
+    response = [Model $ model & uciData . ix i . bestMoveMVars .~ v]
 
 setEngineLogChanHandle :: Maybe (Chan UCILog) -> EventHandle
 setEngineLogChanHandle v model = response where
@@ -572,17 +565,17 @@ runAnalysisHandle model@(AppModel{..}) = response where
         newTablebaseData <- tablebaseRequestAnalysis pos
         raiseEvent $ AppSetTablebaseData newTablebaseData
     uciHandler _ = do
-        let (bestMoveVar, bestSyncVar) = fromJust _adUciBestMoveMVar
-        when (isJust _adUciBestMoveMVar) $ do
+        let (bestMoveVar, bestSyncVar) = fromJust _uciBestMoveMVars
+        when (isJust _uciBestMoveMVars) $ do
             _ <- tryTakeMVar bestMoveVar
             _ <- tryTakeMVar bestSyncVar
             putMVar bestSyncVar ()
-        uciRequestAnalysis (_amUciData!!_amUciIndex) initPos pos uciMoves
+        uciRequestAnalysis currentUciData initPos pos uciMoves
     pos = _ppPosition currentPP
     initPos = _ppPosition $ indexPositionTree model 0
     uciMoves = _ppUciMoves currentPP
     currentPP = indexPositionTree model _amCurrentPlyNumber
-    AIData{..} = _amAiData
+    currentUciData@(UCIData{..}) = _amUciData!!_amUciIndex
 
 sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where

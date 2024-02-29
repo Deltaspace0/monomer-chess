@@ -44,7 +44,7 @@ instance Show ResponseMethod where
 
 data AIData = AIData
     { _adResponseMethod :: ResponseMethod
-    , _adUciBestMoveMVar :: Maybe (MVar String, MVar ())
+    , _adUciBestMoveMVar :: Maybe (MVar String)
     , _adResetUciBestMove :: Bool
     , _adMctsRuns :: Int
     , _adMinimaxDepth :: Int
@@ -86,16 +86,13 @@ randomMove position = result where
 
 uciMove
     :: Position
-    -> Maybe (MVar String, MVar ())
+    -> Maybe (MVar String)
     -> IO (Maybe Ply, Maybe Text)
 uciMove position maybeVar = result where
     result = if null (legalPlies position)
         then return (Nothing, Just "No legal moves")
-        else maybe noMVarMessage (getBestMove . fst) maybeVar
-    noMVarMessage = return (Nothing, Just "MVar is not initialized")
-    getBestMove bestMoveVar = do
-        uciText <- takeMVar bestMoveVar
-        let ply = fromUCI position uciText
-        if null ply && (uciText /= "nouci")
-            then getBestMove bestMoveVar
-            else return (ply, Nothing)
+        else maybe noMVarMessage getBestMove maybeVar
+    noMVarMessage = return (Nothing, Just "Error: UCI is not initialized")
+    getBestMove mvar = takeMVar mvar >>= \x -> case fromUCI position x of
+        Just ply -> return (Just ply, Nothing)
+        Nothing -> getBestMove mvar
