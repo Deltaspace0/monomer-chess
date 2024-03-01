@@ -344,12 +344,14 @@ setResetUciBestMoveHandle v model = response where
 
 playNextResponseHandle :: EventHandle
 playNextResponseHandle AppModel{..} = response where
-    response = [Producer producerHandler]
+    response = [responseIf canRespond $ Producer producerHandler]
+    canRespond = null _amEvalProgress || _adResponseMethod /= UCIResponse
     producerHandler raiseEvent = do
-        let bestSyncVar = snd $ fromJust _uciBestMoveMVars
-        when (isJust _uciBestMoveMVars && _adResetUciBestMove) $ do
-            takeMVar bestSyncVar
-            raiseEvent $ AppSetResetUciBestMove False
+        when (_adResponseMethod == UCIResponse) $ do
+            let bestSyncVar = snd $ fromJust _uciBestMoveMVars
+            when (isJust _uciBestMoveMVars && _adResetUciBestMove) $ do
+                takeMVar bestSyncVar
+                raiseEvent $ AppSetResetUciBestMove False
         mvar <- newEmptyMVar
         thread <- forkIO $ do
             result <- calculateMove _amChessPosition $ _amAiData
@@ -581,7 +583,7 @@ runAnalysisHandle model@(AppModel{..}) = response where
         , if _amShowTablebase
             then Producer tablebaseHandler
             else Model $ model & tablebaseData .~ defaultTablebaseData
-        , Producer uciHandler
+        , responseIf (null _amEvalProgress) $ Producer uciHandler
         ]
     tablebaseHandler raiseEvent = do
         raiseEvent $ AppSetTablebaseData $ _amTablebaseData
