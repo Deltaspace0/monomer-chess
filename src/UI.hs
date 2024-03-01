@@ -174,8 +174,15 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , zstack
                 [ label "Analysis graph"
-                , box_ [alignRight] $ button "Refresh" AppSyncEvalGroups
+                , box_ [alignRight] $ hstack'
+                    [ if null _amEvalProgress
+                        then button "Complete eval" AppCompleteEval
+                        else button "Abort" AppAbortEval
+                    , button "Refresh" AppSyncEvalGroups
+                    ]
                 ]
+            , widgetIf (isJust _amEvalProgress) $
+                label $ fromMaybe "" _amEvalProgress
             , graphWithData_ (graphDataEval <> [currentMoveGraphData])
                 [ lockX
                 , lockY

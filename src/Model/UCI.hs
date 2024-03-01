@@ -250,7 +250,7 @@ getNewPrincipalVariations
     -> [(Text, Maybe Ply, Maybe Double)]
     -> [(Text, Maybe Ply, Maybe Double)]
 getNewPrincipalVariations position uciOutput variations = newVariations where
-    newVariations = if "pv" `elem` ws
+    newVariations = if "score" `elem` ws
         then (variations <> emptyLines) & ix (j-1) .~ newVariation
         else variations
     emptyLines = replicate (j-length variations) ("...", Nothing, Nothing)
@@ -259,31 +259,32 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
         else 1
     newVariation = (uciInfo, firstPly, evalDouble)
     uciInfo
+        | not correctUci = ""
         | correctUci && movesText == "???" = ""
         | correctUci = evaluationText <> " " <> movesText
         | otherwise = "error - invalid UCI"
     correctUci = and
         [ "score" `elem` ws
         , "pv" `elem` ws
-        , si <= length ws-3
+        , fromJust si <= length ws-3
         ]
     evaluationText = case evalType of
-        "cp" -> (if signCondition then "-" else "+") <> cpNumberText
-        "mate" -> (if signCondition then "#-" else "#") <> mateNumberText
+        Just "cp" -> (if signCondition then "-" else "+") <> cpNumberText
+        Just "mate" -> (if signCondition then "#-" else "#") <> mateNumberText
         _ -> "???"
     evalDouble = case evalType of
-        "cp" | signCondition -> Just $ -(abs cpNumber)
-        "cp" -> Just $ abs cpNumber
-        "mate" | signCondition -> Just (-200)
-        "mate" -> Just 200
+        Just "cp" | signCondition -> Just $ -(abs cpNumber)
+        Just "cp" -> Just $ abs cpNumber
+        Just "mate" | signCondition -> Just (-200)
+        Just "mate" -> Just 200
         _ -> Nothing
     signCondition = (color position == White) /= (cpNumber > 0)
     mateNumberText = showt $ abs (read evalNumber :: Int)
     cpNumberText = pack $ showFFloat Nothing (abs cpNumber) ""
     cpNumber = (read evalNumber :: Double)/100
-    evalType = ws!!(si+1)
-    evalNumber = ws!!(si+2)
-    movesText = snd $ foldl foldUCI (Just position, "") uciMoves
+    evalType = (\x -> ws!!(x+1)) <$> si
+    evalNumber = ws!!(fromJust si + 2)
+    movesText = snd $ foldl foldUCI (Just position, "") $ fromJust uciMoves
     foldUCI (Nothing, _) _ = (Nothing, "???")
     foldUCI (Just pos, sanMoves) uciMove = res where
         res = if null ply || (not $ (fromJust ply) `elem` legalPlies pos)
@@ -297,10 +298,10 @@ getNewPrincipalVariations position uciOutput variations = newVariations where
         number = showt $ moveNumber pos
         san = pack $ unsafeToSAN pos $ fromJust ply
         ply = fromUCI pos uciMove
-    uciMoves = drop (fromJust (elemIndex "pv" ws) + 1) ws
-    si = fromJust $ elemIndex "score" ws
+    uciMoves = flip drop ws . succ <$> elemIndex "pv" ws
+    si = elemIndex "score" ws
     ws = words uciOutput
-    firstPly = listToMaybe uciMoves >>= fromUCI position
+    firstPly = uciMoves >>= listToMaybe >>= fromUCI position
 
 uciRequestAnalysis :: UCIData -> Position -> Position -> String -> IO ()
 uciRequestAnalysis UCIData{..} initPos pos uciMoves = do

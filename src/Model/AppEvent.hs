@@ -21,6 +21,7 @@ import Monomer
 import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
 import Text.Megaparsec
+import TextShow
 
 import Model.AppModel
 
@@ -61,6 +62,11 @@ data AppEvent
     | AppSetPrincipalVariations Int [(Text, Maybe Ply, Maybe Double)]
     | AppSetOptionsUCI Int UCIOptions
     | AppRunAnalysis
+    | AppCompleteEval
+    | AppAbortEval
+    | AppSetEvalProgress (Maybe Text)
+    | AppSetEvalProgressMVars (Maybe (MVar [Int], MVar (Tree PP), MVar ()))
+    | AppSetPositionTree (Tree PP)
     | AppSendEngineRequest String
     | AppSetUciLogs Text
     | AppClearUciLogs
@@ -112,6 +118,11 @@ handleEvent _ _ model event = case event of
     AppSetPrincipalVariations i v -> setPrincipalVariationsHandle i v model
     AppSetOptionsUCI i v -> setOptionsUCIHandle i v model
     AppRunAnalysis -> runAnalysisHandle model
+    AppCompleteEval -> completeEvalHandle model
+    AppAbortEval -> abortEvalHandle model
+    AppSetEvalProgress v -> setEvalProgressHandle v model
+    AppSetEvalProgressMVars v -> setEvalProgressMVarsHandle v model
+    AppSetPositionTree v -> setPositionTreeHandle v model
     AppSendEngineRequest v -> sendEngineRequestHandle v model
     AppSetUciLogs v -> setUciLogsHandle v model
     AppClearUciLogs -> clearUciLogsHandle model
@@ -182,8 +193,11 @@ syncEvalGroupsHandle model@(AppModel{..}) = response where
             | null gs || null (head gs) = (Just [(x, y), (x, 0)]):gs
             | meet = (Just [(x, y), mp, mp]):(Just $ mp:headGroup):(tail gs)
             | otherwise = (Just $ (x, y):headGroup):(tail gs)
-        meet = y*y' < 0
-        mp = (x+evalStep/(1-y'/y), if y' < 0 then -0.0001 else 0.0001)
+        meet = y*y' <= 0
+        mp = (x+evalStep/(1-yDiv), if y' < 0 then -0.0001 else 0.0001)
+        yDiv = if y == 0
+            then 1000000
+            else y'/y
         y' = snd $ head headGroup
         headGroup = fromJust $ head gs
         gs = makeEvalGroups xs
@@ -530,20 +544,31 @@ setPrincipalVariationsHandle
     -> EventHandle
 setPrincipalVariationsHandle i v model@(AppModel{..}) = response where
     response =
-        [ Model $ model
-            & positionTree .~ newPositionTree
-            & uciData . ix i . principalVariations .~ v
+        [ Model $ model & uciData . ix i . principalVariations .~ v
+        , Producer producerHandler
         ]
-    newPositionTree = if null newEval || i /= _amUciIndex
-        then _amPositionTree
-        else head offsetChildNodes
-    Node _ offsetChildNodes = fst $ insertTree cutOffPath pp offsetTree
-    pp = ppOld {_ppEval = newEval}
-    ppOld = indexPositionTree model _amCurrentPlyNumber
-    cutOffPath = take _amCurrentPlyNumber $ 0:_amPositionTreePath
-    offsetTree = Node dummyValue [_amPositionTree]
-    Node dummyValue _ = _amPositionTree
+    producerHandler raiseEvent = do
+        let (assignmentMVar, treeMVar, _) = fromJust _amEvalProgressMVars
+            bestSyncVar = snd $ fromJust _uciBestMoveMVars
+        when (isJust _amEvalProgressMVars && isJust newEval) $ do
+            assignments <- readMVar assignmentMVar
+            let j = assignments!!i
+            when (i < length assignments && j >= 0) $ do
+                tree <- takeMVar treeMVar
+                let Node dummyValue _ = tree
+                    offsetTree = Node dummyValue [tree]
+                    cutOffPath = take j $ 0:_amPositionTreePath
+                    ppOld = indexPositionTree model j
+                    pp = ppOld {_ppEval = newEval}
+                    Node _ nodes = fst $ insertTree cutOffPath pp offsetTree
+                    newPositionTree = head nodes
+                raiseEvent $ AppSetPositionTree newPositionTree
+                putMVar treeMVar newPositionTree
+                when (isJust _uciBestMoveMVars) $ do
+                    _ <- tryTakeMVar bestSyncVar
+                    putMVar bestSyncVar ()
     newEval = listToMaybe v >>= \(_, _, x) -> x
+    UCIData{..} = _amUciData!!i
 
 setOptionsUCIHandle :: Int -> UCIOptions -> EventHandle
 setOptionsUCIHandle i v model = response where
@@ -576,6 +601,80 @@ runAnalysisHandle model@(AppModel{..}) = response where
     uciMoves = _ppUciMoves currentPP
     currentPP = indexPositionTree model _amCurrentPlyNumber
     currentUciData@(UCIData{..}) = _amUciData!!_amUciIndex
+
+completeEvalHandle :: EventHandle
+completeEvalHandle model@(AppModel{..}) = response where
+    response =
+        [ Model $ model & evalProgress .~ Just "Waiting for UCI engines..."
+        , Producer producerHandler
+        ]
+    producerHandler raiseEvent = do
+        progressCounter <- newMVar 0
+        taskQueue <- newMVar [0..currentBranchLength]
+        assignmentMVar <- newMVar $ _amUciData >> [-1]
+        treeMVar <- newMVar _amPositionTree
+        allDone <- newEmptyMVar
+        indefBlocker <- newEmptyMVar
+        let progressMVars = (assignmentMVar, treeMVar, allDone)
+        raiseEvent $ AppSetEvalProgressMVars $ Just progressMVars
+        threads <- forM _amUciData $ \x@(UCIData{..}) -> forkIO $ forever $ do
+            let (bestMoveVar, bestSyncVar) = fromJust _uciBestMoveMVars
+            when (null _uciBestMoveMVars) $ takeMVar indefBlocker
+            queue <- takeMVar taskQueue
+            when (not $ null queue) $ do
+                let pn = head queue
+                    PP{..} = indexPositionTree model pn
+                putMVar taskQueue $ tail queue
+                _ <- tryTakeMVar bestMoveVar
+                uciRequestAnalysis x initPos _ppPosition _ppUciMoves
+                _ <- takeMVar bestMoveVar
+                assignments1 <- takeMVar assignmentMVar
+                let newAssignments1 = assignments1 & ix _uciEngineIndex .~ pn
+                putMVar assignmentMVar newAssignments1
+                takeMVar bestSyncVar
+                assignments2 <- takeMVar assignmentMVar
+                let newAssignments2 = assignments2 & ix _uciEngineIndex .~ -1
+                putMVar assignmentMVar newAssignments2
+                currentProgress <- takeMVar progressCounter
+                let newProgress = currentProgress+1
+                if currentProgress >= currentBranchLength
+                    then putMVar allDone ()
+                    else putMVar progressCounter newProgress
+                raiseEvent $ AppSetEvalProgress $ showProgress newProgress
+        takeMVar allDone
+        forM_ threads killThread
+        raiseEvent $ AppSetEvalProgress Nothing
+        threadDelay 200000
+        raiseEvent AppSyncEvalGroups
+    showProgress x = Just $ "Done " <> (showt x) <> progressTextSuffix
+    progressTextSuffix = "/" <> (showt $ currentBranchLength+1)
+    currentBranchLength = length _amPositionTreePath
+    initPos = _ppPosition $ indexPositionTree model 0
+
+abortEvalHandle :: EventHandle
+abortEvalHandle model@(AppModel{..}) = response where
+    response = if null _amEvalProgressMVars
+        then []
+        else
+            [ Model $ model
+                & evalProgress .~ Nothing
+                & evalProgressMVars .~ Nothing
+            , Producer producerHandler
+            ]
+    producerHandler _ = putMVar doneMVar ()
+    (_, _, doneMVar) = fromJust _amEvalProgressMVars
+
+setEvalProgressHandle :: Maybe Text -> EventHandle
+setEvalProgressHandle v model = [Model $ model & evalProgress .~ v]
+
+setEvalProgressMVarsHandle
+    :: Maybe (MVar [Int], MVar (Tree PP), MVar ())
+    -> EventHandle
+setEvalProgressMVarsHandle v model = response where
+    response = [Model $ model & evalProgressMVars .~ v]
+
+setPositionTreeHandle :: Tree PP -> EventHandle
+setPositionTreeHandle v model = [Model $ model & positionTree .~ v]
 
 sendEngineRequestHandle :: String -> EventHandle
 sendEngineRequestHandle v AppModel{..} = [Producer producerHandler] where

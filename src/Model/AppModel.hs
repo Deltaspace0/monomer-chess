@@ -35,6 +35,8 @@ module Model.AppModel
     , uciIndex
     , uciLogs
     , uciRecordLogs
+    , evalProgress
+    , evalProgressMVars
     , initModel
     , isWhiteTurn
     , indexPositionTree
@@ -83,6 +85,8 @@ data AppModel = AppModel
     , _amUciIndex :: Int
     , _amUciLogs :: Text
     , _amUciRecordLogs :: Bool
+    , _amEvalProgress :: Maybe Text
+    , _amEvalProgressMVars :: Maybe (MVar [Int], MVar (Tree PP), MVar ())
     } deriving (Eq, Show)
 
 makeLensesWith abbreviatedFields 'AppModel
@@ -114,6 +118,8 @@ initModel = AppModel
     , _amUciIndex = 0
     , _amUciLogs = ""
     , _amUciRecordLogs = False
+    , _amEvalProgress = Nothing
+    , _amEvalProgressMVars = Nothing
     } where
         (startState, startStateReversed) = getBoardStates startpos
 
