@@ -74,6 +74,7 @@ data AppEvent
     | AppUciNewSlot
     | AppUciCloneSlot
     | AppSetTablebaseData TablebaseData
+    | AppGraphClicked (Double, Double)
     deriving (Eq, Show)
 
 instance NFData Ply where
@@ -131,6 +132,7 @@ handleEvent _ _ model event = case event of
     AppUciNewSlot -> uciNewSlotHandle model
     AppUciCloneSlot -> uciCloneSlotHandle model
     AppSetTablebaseData v -> setTablebaseDataHandle v model
+    AppGraphClicked v -> graphClickedHandle v model
 
 initHandle :: EventHandle
 initHandle _ = [Producer producerHandler] where
@@ -754,3 +756,9 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
 
 setTablebaseDataHandle :: TablebaseData -> EventHandle
 setTablebaseDataHandle v model = [Model $ model & tablebaseData .~ v]
+
+graphClickedHandle :: (Double, Double) -> EventHandle
+graphClickedHandle (x, _) AppModel{..} = response where
+    response = [Event $ AppPlyNumberChanged $ round $ x/evalStep]
+    evalStep = 0.96/(fromIntegral currentBranchLength + 0.0001)
+    currentBranchLength = length _amPositionTreePath

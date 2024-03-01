@@ -189,10 +189,12 @@ buildUI _ model@(AppModel{..}) = tree where
                 , hideGrid
                 , limitX (-0.02, 0.98)
                 , limitY (-0.171, 0.171)
+                , onRightClick AppGraphClicked
                 ] `styleBasic`
                     [ sizeReqH $ fixedSize 128
                     , bgColor $ rgb 42 34 69
                     ]
+            , label "Right click on graph to set the position on that move"
             , separatorLine
             , uciPanel
             ] `styleBasic` [padding 8]
