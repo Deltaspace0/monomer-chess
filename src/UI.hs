@@ -332,12 +332,13 @@ buildUI _ model@(AppModel{..}) = tree where
     noLegalMoves = null $ legalPlies _amChessPosition
     uciPanel = vstack_ [childSpacing_ 16]
         [ zstack
-            [ label "UCI engine settings"
+            [ label "UCI settings"
             , box_ [alignRight] $ hstack'
                 [ textDropdown_ uciIndex [0..length _amUciData-1]
                     (("UCI" <>) . showt) [onChange uciIndexEvent] `styleBasic`
-                        [sizeReqW $ fixedSize 128]
-                , button "New slot" AppUciNewSlot
+                        [sizeReqW $ fixedSize 100]
+                , button "Clone" AppUciCloneSlot
+                , button "New" AppUciNewSlot
                 ]
             ]
         , hstack_ [childSpacing_ 16]

@@ -72,6 +72,7 @@ data AppEvent
     | AppClearUciLogs
     | AppRecordUCILogsChanged Bool
     | AppUciNewSlot
+    | AppUciCloneSlot
     | AppSetTablebaseData TablebaseData
     deriving (Eq, Show)
 
@@ -128,6 +129,7 @@ handleEvent _ _ model event = case event of
     AppClearUciLogs -> clearUciLogsHandle model
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
     AppUciNewSlot -> uciNewSlotHandle model
+    AppUciCloneSlot -> uciCloneSlotHandle model
     AppSetTablebaseData v -> setTablebaseDataHandle v model
 
 initHandle :: EventHandle
@@ -727,6 +729,24 @@ uciNewSlotHandle model@(AppModel{..}) = response where
         & engineNextIndex .~ newEngineIndex
         & engineLogChan .~ _uciEngineLogChan (head _amUciData)
     newEngineIndex = length _amUciData
+
+uciCloneSlotHandle :: EventHandle
+uciCloneSlotHandle model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & uciData <>~ [newUciData]
+            & uciIndex .~ newEngineIndex
+        ]
+    newUciData = defaultUciData
+        & engineIndex .~ newEngineIndex
+        & engineNextIndex .~ newEngineIndex
+        & enginePath .~ _uciEnginePath
+        & engineDepth .~ _uciEngineDepth
+        & engineNodes .~ _uciEngineNodes
+        & engineDepthOrNodes .~ _uciEngineDepthOrNodes
+        & engineLogChan .~ _uciEngineLogChan
+    newEngineIndex = length _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
 
 setTablebaseDataHandle :: TablebaseData -> EventHandle
 setTablebaseDataHandle v model = [Model $ model & tablebaseData .~ v]
