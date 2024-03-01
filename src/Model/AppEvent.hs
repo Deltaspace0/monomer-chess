@@ -158,19 +158,21 @@ initHandle _ = [Producer producerHandler] where
             LogOutput i x -> recordLog "stdout" i x
 
 setPositionHandle :: Position -> EventHandle
-setPositionHandle position model =
-    [ Model $ model
-        & chessPosition .~ position
-        & positionTree .~ treeFromPosition position
-        & positionTreePath .~ []
-        & currentPlyNumber .~ 0
-        & showPromotionMenu .~ False
-        & sanMoves .~ ""
-        & forsythEdwards .~ pack (toFEN position)
-        & aiData . aiMessage .~ Nothing
-    , Event AppSyncBoard
-    , Event AppRunAnalysis
-    ]
+setPositionHandle position model@(AppModel{..}) = if isJust _amEvalProgress
+    then []
+    else
+        [ Model $ model
+            & chessPosition .~ position
+            & positionTree .~ treeFromPosition position
+            & positionTreePath .~ []
+            & currentPlyNumber .~ 0
+            & showPromotionMenu .~ False
+            & sanMoves .~ ""
+            & forsythEdwards .~ pack (toFEN position)
+            & aiData . aiMessage .~ Nothing
+        , Event AppSyncBoard
+        , Event AppRunAnalysis
+        ]
 
 syncBoardHandle :: EventHandle
 syncBoardHandle model@(AppModel{..}) = response where
@@ -211,7 +213,7 @@ syncEvalGroupsHandle model@(AppModel{..}) = response where
 
 boardChangedHandle :: ([[Piece]], Int, Int) -> EventHandle
 boardChangedHandle info@(_, ixTo, ixFrom) model@(AppModel{..})
-    | isJust _amResponseThread || differentBoards = [Event AppSyncBoard]
+    | movingDisabled = [Event AppSyncBoard]
     | _amAutoQueen =
         [ setNextPly
         , Event AppRunNextPly
@@ -225,7 +227,11 @@ boardChangedHandle info@(_, ixTo, ixFrom) model@(AppModel{..})
         , responseIf noPromotion $ Event AppPlayNextResponse
         ]
     where
-        differentBoards = abs (ixTo-ixFrom) > 100
+        movingDisabled = or
+            [ isJust _amResponseThread
+            , isJust _amEvalProgress
+            , abs (ixTo-ixFrom) > 100
+            ]
         setNextPly = Model $ model & nextPly .~ Just ply
         ply = getPromotedPly model info Queen
         noPromotion = null $ plyPromotion ply
@@ -302,7 +308,7 @@ doPlyHandle ply model =
 
 runNextPlyHandle :: EventHandle
 runNextPlyHandle model@(AppModel{..}) = response where
-    response = if null newPosition || not isLegal
+    response = if isJust _amEvalProgress || null newPosition || not isLegal
         then []
         else
             [ Model $ model
@@ -373,14 +379,16 @@ abortNextResponseHandle model@(AppModel{..}) =
 
 responseCalculatedHandle :: (Maybe Ply, Maybe Text) -> EventHandle
 responseCalculatedHandle (ply, message) model@(AppModel{..}) = response where
-    response =
-        [ Model $ model
-            & nextPly .~ ply
-            & responseThread .~ Nothing
-            & aiData . aiMessage .~ message
-            & uciIndex .~ newEngineIndex
-        , Event AppRunNextPly
-        ]
+    response = if isJust _amEvalProgress
+        then []
+        else
+            [ Model $ model
+                & nextPly .~ ply
+                & responseThread .~ Nothing
+                & aiData . aiMessage .~ message
+                & uciIndex .~ newEngineIndex
+            , Event AppRunNextPly
+            ]
     newEngineIndex = if _adResponseMethod == UCIResponse && isJust ply
         then _uciEngineNextIndex
         else _amUciIndex
@@ -427,19 +435,21 @@ positionTreePathChangedHandle v model@(AppModel{..}) = response where
 
 undoMoveHandle :: EventHandle
 undoMoveHandle model@(AppModel{..}) = response where
-    response =
-        [ Model $ model
-            & chessPosition .~ _ppPosition
-            & positionTree .~ newPositionTree
-            & positionTreePath .~ newTreePath
-            & currentPlyNumber .~ length newTreePath
-            & showPromotionMenu .~ False
-            & sanMoves .~ treeToSanMoves newPositionTree
-            & forsythEdwards .~ pack (toFEN _ppPosition)
-            & aiData . aiMessage .~ Nothing
-        , Event AppSyncBoard
-        , Event AppRunAnalysis
-        ]
+    response = if isJust _amEvalProgress
+        then []
+        else
+            [ Model $ model
+                & chessPosition .~ _ppPosition
+                & positionTree .~ newPositionTree
+                & positionTreePath .~ newTreePath
+                & currentPlyNumber .~ length newTreePath
+                & showPromotionMenu .~ False
+                & sanMoves .~ treeToSanMoves newPositionTree
+                & forsythEdwards .~ pack (toFEN _ppPosition)
+                & aiData . aiMessage .~ Nothing
+            , Event AppSyncBoard
+            , Event AppRunAnalysis
+            ]
     Node PP{..} _ = indexTree newTreePath newPositionTree
     newTreePath = initTreePath <> replicate tailDepth 0
     tailDepth = getTreeTailDepth initTreePath newPositionTree
@@ -447,19 +457,21 @@ undoMoveHandle model@(AppModel{..}) = response where
     newPositionTree = pruneTree _amPositionTreePath _amPositionTree
 
 setGameHandle :: Game -> EventHandle
-setGameHandle CG{..} model = response where
-    response =
-        [ Model $ model
-            & chessPosition .~ position
-            & positionTree .~ tree
-            & positionTreePath .~ newTreePath
-            & currentPlyNumber .~ 0
-            & showPromotionMenu .~ False
-            & forsythEdwards .~ fromMaybe (pack (toFEN startpos)) gameFEN
-            & aiData . aiMessage .~ Nothing
-        , Event AppSyncBoard
-        , Event AppRunAnalysis
-        ]
+setGameHandle CG{..} model@(AppModel{..}) = response where
+    response = if isJust _amEvalProgress
+        then []
+        else
+            [ Model $ model
+                & chessPosition .~ position
+                & positionTree .~ tree
+                & positionTreePath .~ newTreePath
+                & currentPlyNumber .~ 0
+                & showPromotionMenu .~ False
+                & forsythEdwards .~ fromMaybe (pack (toFEN startpos)) gameFEN
+                & aiData . aiMessage .~ Nothing
+            , Event AppSyncBoard
+            , Event AppRunAnalysis
+            ]
     position = fromMaybe startpos $ gameFEN >>= fromFEN . unpack
     gameFEN = lookup "FEN" _cgTags
     newTreePath = replicate (getTreeTailDepth [] tree) 0
