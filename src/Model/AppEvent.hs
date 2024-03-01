@@ -189,7 +189,10 @@ syncBoardHandle model@(AppModel{..}) = response where
 syncEvalGroupsHandle :: EventHandle
 syncEvalGroupsHandle model@(AppModel{..}) = response where
     response = [Model $ model & evalGroups .~ newEvalGroups]
-    newEvalGroups = fromJust <$> (filter isJust $ makeEvalGroups evalPoints)
+    newEvalGroups = insertOrigin $ fromJust <$> (filter isJust rawEvalGroups)
+    insertOrigin [] = []
+    insertOrigin (x:xs) = ((0, 0):x):xs
+    rawEvalGroups = makeEvalGroups evalPoints
     makeEvalGroups [] = []
     makeEvalGroups (Nothing:xs) = Nothing:(makeEvalGroups xs)
     makeEvalGroups ((Just (x, y)):xs) = result where
