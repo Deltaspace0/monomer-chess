@@ -740,6 +740,7 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
     newUciData = defaultUciData
         & engineIndex .~ newEngineIndex
         & engineNextIndex .~ newEngineIndex
+        & engineLiveReport .~ _uciEngineLiveReport
         & enginePath .~ _uciEnginePath
         & engineDepth .~ _uciEngineDepth
         & engineNodes .~ _uciEngineNodes

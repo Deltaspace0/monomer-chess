@@ -10,6 +10,7 @@ module Model.UCI
     , UCIData(..)
     , engineIndex
     , engineNextIndex
+    , engineLiveReport
     , enginePath
     , engineLoading
     , engineDepth
@@ -69,6 +70,7 @@ data UCIEvent
 data UCIData = UCIData
     { _uciEngineIndex :: Int
     , _uciEngineNextIndex :: Int
+    , _uciEngineLiveReport :: Bool
     , _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
@@ -94,6 +96,7 @@ defaultUciData :: UCIData
 defaultUciData = UCIData
     { _uciEngineIndex = 0
     , _uciEngineNextIndex = 0
+    , _uciEngineLiveReport = True
     , _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20
@@ -174,6 +177,7 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     let getNewPV = getNewPrincipalVariations pos
                         uciBestMove = getUciBestMove x
                     when (isJust uciBestMove) $ do
+                        readIORef pvRef >>= raiseEvent . EventSetPV
                         _ <- tryTakeMVar bestMoveVar
                         putMVar bestMoveVar $ fromJust uciBestMove
                     atomicModifyIORef depthRef $ \v -> (getUciDepth x v, ())
@@ -202,14 +206,17 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     let rvarOld = fst $ fromJust _uciRequestMVars
                     putMVar rvarOld "eof"
                 _ <- forkIO uciOutputLoop
-                reportThread <- forkIO uciReportLoop
+                reportThread <- if _uciEngineLiveReport
+                    then Just <$> forkIO uciReportLoop
+                    else return Nothing
                 opts <- initUciOptions . reorderUciOpts <$> readIORef optRef
                 raiseEvent $ EventSetRequestMVars $ Just (rvar, pvar)
                 raiseEvent $ EventSetBestMoveMVars $ Just bestVars
                 raiseEvent $ EventSetOptionsUCI opts
                 uciRequestLoop
                 terminateProcess processHandle
-                killThread reportThread
+                when (isJust reportThread) $
+                    killThread $ fromJust reportThread
                 raiseEvent $ EventSetCurrentDepth Nothing
                 raiseEvent $ EventSetPV []
                 raiseEvent $ EventSetRequestMVars Nothing

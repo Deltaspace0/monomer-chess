@@ -355,6 +355,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 , button "Halt engine" $ AppSendEngineRequest "eof"
                 ]
         , separatorLine
+        , labeledCheckbox' "Live PV report" $ uciData' . engineLiveReport
         , zstack_ [onlyTopActive_ False]
             [ labeledCheckbox_ "Record UCI logs to file" uciRecordLogs
                 [ textRight
