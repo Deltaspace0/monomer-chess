@@ -358,6 +358,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 ]
         , separatorLine
         , labeledCheckbox' "Live PV report" $ uciData' . engineLiveReport
+        , labeledCheckbox' "Graph builder" $ uciData' . engineGraphBuilder
         , zstack_ [onlyTopActive_ False]
             [ labeledCheckbox_ "Record UCI logs to file" uciRecordLogs
                 [ textRight

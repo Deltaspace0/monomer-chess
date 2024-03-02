@@ -11,6 +11,7 @@ module Model.UCI
     , engineIndex
     , engineNextIndex
     , engineLiveReport
+    , engineGraphBuilder
     , enginePath
     , engineLoading
     , engineDepth
@@ -71,6 +72,7 @@ data UCIData = UCIData
     { _uciEngineIndex :: Int
     , _uciEngineNextIndex :: Int
     , _uciEngineLiveReport :: Bool
+    , _uciEngineGraphBuilder :: Bool
     , _uciEnginePath :: Text
     , _uciEngineLoading :: Bool
     , _uciEngineDepth :: Int
@@ -97,6 +99,7 @@ defaultUciData = UCIData
     { _uciEngineIndex = 0
     , _uciEngineNextIndex = 0
     , _uciEngineLiveReport = True
+    , _uciEngineGraphBuilder = True
     , _uciEnginePath = ""
     , _uciEngineLoading = False
     , _uciEngineDepth = 20

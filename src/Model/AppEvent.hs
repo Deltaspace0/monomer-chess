@@ -644,8 +644,12 @@ completeEvalHandle model@(AppModel{..}) = response where
         threads <- forM _amUciData $ \x@(UCIData{..}) -> forkIO $ forever $ do
             let (bestMoveVar, bestSyncVar) = fromJust _uciBestMoveMVars
                 rvar = fst $ fromJust _uciRequestMVars
-            when (null _uciBestMoveMVars || null _uciRequestMVars) $
-                takeMVar indefBlocker
+                blockNeeded = or
+                    [ not _uciEngineGraphBuilder
+                    , null _uciBestMoveMVars
+                    , null _uciRequestMVars
+                    ]
+            when blockNeeded $ takeMVar indefBlocker
             queue <- takeMVar taskQueue
             when (not $ null queue) $ do
                 let pn = head queue
@@ -753,6 +757,7 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
         & engineIndex .~ newEngineIndex
         & engineNextIndex .~ newEngineIndex
         & engineLiveReport .~ _uciEngineLiveReport
+        & engineGraphBuilder .~ _uciEngineGraphBuilder
         & enginePath .~ _uciEnginePath
         & engineDepth .~ _uciEngineDepth
         & engineNodes .~ _uciEngineNodes
