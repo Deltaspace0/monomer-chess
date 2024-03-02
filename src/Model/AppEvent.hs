@@ -73,6 +73,7 @@ data AppEvent
     | AppRecordUCILogsChanged Bool
     | AppUciNewSlot
     | AppUciCloneSlot
+    | AppDistributeUciDepth
     | AppSetTablebaseData TablebaseData
     | AppGraphClicked (Double, Double)
     deriving (Eq, Show)
@@ -131,6 +132,7 @@ handleEvent _ _ model event = case event of
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
     AppUciNewSlot -> uciNewSlotHandle model
     AppUciCloneSlot -> uciCloneSlotHandle model
+    AppDistributeUciDepth -> distributeUciDepthHandle model
     AppSetTablebaseData v -> setTablebaseDataHandle v model
     AppGraphClicked v -> graphClickedHandle v model
 
@@ -757,6 +759,16 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
         & engineDepthOrNodes .~ _uciEngineDepthOrNodes
         & engineLogChan .~ _uciEngineLogChan
     newEngineIndex = length _amUciData
+    UCIData{..} = _amUciData!!_amUciIndex
+
+distributeUciDepthHandle :: EventHandle
+distributeUciDepthHandle model@(AppModel{..}) = response where
+    response = [Model $ model & uciData %~ map distributeDepth]
+    distributeDepth :: UCIData -> UCIData
+    distributeDepth x = x
+        & engineDepth .~ _uciEngineDepth
+        & engineNodes .~ _uciEngineNodes
+        & engineDepthOrNodes .~ _uciEngineDepthOrNodes
     UCIData{..} = _amUciData!!_amUciIndex
 
 setTablebaseDataHandle :: TablebaseData -> EventHandle

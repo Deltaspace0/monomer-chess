@@ -380,6 +380,7 @@ buildUI _ model@(AppModel{..}) = tree where
                 (uciData' . engineDepthOrNodes) [textRight]
             , numericField $ uciData' . engineNodes
             ]
+        , button "Apply for every UCI engine" AppDistributeUciDepth
         , separatorLine
         , label "UCI options"
         , if null _uciRequestMVars
