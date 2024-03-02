@@ -177,6 +177,7 @@ setPositionHandle position model@(AppModel{..}) = if isJust _amEvalProgress
             & forsythEdwards .~ pack (toFEN position)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
+        , Event AppSyncEvalGroups
         , Event AppRunAnalysis
         ]
 
@@ -329,6 +330,7 @@ runNextPlyHandle model@(AppModel{..}) = response where
                 & sanMoves .~ treeToSanMoves newPositionTree
                 & forsythEdwards .~ pack (toFEN $ fromJust newPosition)
             , Event AppSyncBoard
+            , Event AppSyncEvalGroups
             , Event AppRunAnalysis
             ]
     isLegal = (fromJust _amNextPly) `elem` (legalPlies _amChessPosition)
@@ -434,6 +436,7 @@ positionTreePathChangedHandle v model@(AppModel{..}) = response where
             & forsythEdwards .~ pack (toFEN _ppPosition)
             & aiData . aiMessage .~ Nothing
         , Event AppSyncBoard
+        , Event AppSyncEvalGroups
         , Event AppRunAnalysis
         ]
     Node PP{..} _ = indexTree path _amPositionTree
@@ -457,6 +460,7 @@ undoMoveHandle model@(AppModel{..}) = response where
                 & forsythEdwards .~ pack (toFEN _ppPosition)
                 & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
+            , Event AppSyncEvalGroups
             , Event AppRunAnalysis
             ]
     Node PP{..} _ = indexTree newTreePath newPositionTree
@@ -479,6 +483,7 @@ setGameHandle CG{..} model@(AppModel{..}) = response where
                 & forsythEdwards .~ fromMaybe (pack (toFEN startpos)) gameFEN
                 & aiData . aiMessage .~ Nothing
             , Event AppSyncBoard
+            , Event AppSyncEvalGroups
             , Event AppRunAnalysis
             ]
     position = fromMaybe startpos $ gameFEN >>= fromFEN . unpack
