@@ -177,7 +177,6 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                     let getNewPV = getNewPrincipalVariations pos
                         uciBestMove = getUciBestMove x
                     when (isJust uciBestMove) $ do
-                        readIORef pvRef >>= raiseEvent . EventSetPV
                         _ <- tryTakeMVar bestMoveVar
                         putMVar bestMoveVar $ fromJust uciBestMove
                     atomicModifyIORef depthRef $ \v -> (getUciDepth x v, ())
@@ -191,7 +190,9 @@ loadUciEngine UCIData{..} raiseEvent = loadAction where
                 when ("position" `elem` (words x)) $ do
                     setCurrentDepth Nothing
                     setPrincipalVariations []
-                putLine x
+                if x == "report-pv"
+                    then readIORef pvRef >>= raiseEvent . EventSetPV
+                    else putLine x
                 uciRequestLoop
         hSetBuffering hin LineBuffering
         putLine "uci"

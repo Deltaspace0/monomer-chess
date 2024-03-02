@@ -638,9 +638,12 @@ completeEvalHandle model@(AppModel{..}) = response where
         indefBlocker <- newEmptyMVar
         let progressMVars = (assignmentMVar, treeMVar, allDone)
         raiseEvent $ AppSetEvalProgressMVars $ Just progressMVars
+        threadDelay 200000
         threads <- forM _amUciData $ \x@(UCIData{..}) -> forkIO $ forever $ do
             let (bestMoveVar, bestSyncVar) = fromJust _uciBestMoveMVars
-            when (null _uciBestMoveMVars) $ takeMVar indefBlocker
+                rvar = fst $ fromJust _uciRequestMVars
+            when (null _uciBestMoveMVars || null _uciRequestMVars) $
+                takeMVar indefBlocker
             queue <- takeMVar taskQueue
             when (not $ null queue) $ do
                 let pn = head queue
@@ -652,6 +655,7 @@ completeEvalHandle model@(AppModel{..}) = response where
                 assignments1 <- takeMVar assignmentMVar
                 let newAssignments1 = assignments1 & ix _uciEngineIndex .~ pn
                 putMVar assignmentMVar newAssignments1
+                putMVar rvar "report-pv"
                 takeMVar bestSyncVar
                 assignments2 <- takeMVar assignmentMVar
                 let newAssignments2 = assignments2 & ix _uciEngineIndex .~ -1
@@ -665,6 +669,7 @@ completeEvalHandle model@(AppModel{..}) = response where
         takeMVar allDone
         forM_ threads killThread
         raiseEvent $ AppSetEvalProgress Nothing
+        raiseEvent $ AppSetEvalProgressMVars Nothing
         threadDelay 200000
         raiseEvent AppSyncEvalGroups
     showProgress x = Just $ "Done " <> (showt x) <> progressTextSuffix
