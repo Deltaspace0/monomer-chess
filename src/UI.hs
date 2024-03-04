@@ -164,6 +164,7 @@ buildUI _ model@(AppModel{..}) = tree where
             , separatorLine
             , labeledCheckbox' "Rotate board" boardRotated
             , labeledCheckbox' "Auto promote to queen" autoQueen
+            , labeledCheckbox' "Show legal moves" showLegal
             , separatorLine
             , aiPanel aiData
             , widgetIf (_adResponseMethod == UCIResponse) $ hstack'
@@ -289,12 +290,14 @@ buildUI _ model@(AppModel{..}) = tree where
     gameBoard = dragboard_ 8 8 boardState checkerPath
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
+        , showLegalMoves_ _amShowLegal
         , onChange AppBoardChanged
         ]
     gameBoardR = dragboard_ 8 8 boardStateReversed checkerPath
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
         , dragIdOffset 500
+        , showLegalMoves_ _amShowLegal
         , onChange AppBoardChanged
         ]
     editBoard = dragboard_ 8 8 (fenData . fenBoardState) checkerPath
