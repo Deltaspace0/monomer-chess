@@ -165,6 +165,7 @@ buildUI _ model@(AppModel{..}) = tree where
             , labeledCheckbox' "Rotate board" boardRotated
             , labeledCheckbox' "Auto promote to queen" autoQueen
             , labeledCheckbox' "Show legal moves" showLegal
+            , labeledCheckbox' "Show coordinates" showCoords
             , separatorLine
             , aiPanel aiData
             , widgetIf (_adResponseMethod == UCIResponse) $ hstack'
@@ -310,24 +311,28 @@ buildUI _ model@(AppModel{..}) = tree where
         , dragIdOffset 3000
         , onChange AppEditBoardChanged
         ]
-    withCoords x = hstack_ [childSpacing_ 8]
-        [ vstack_ [childSpacing_ 8]
-            [ x
-            , hstack (spacer:(labelH <$> coordsH)) `styleBasic`
-                [sizeReqH $ fixedSize 16]
+    withCoords x = if _amShowCoords
+        then hstack_ [childSpacing_ 8]
+            [ vstack_ [childSpacing_ 8]
+                [ x
+                , hstack (spacer:(labelH <$> coordsH)) `styleBasic`
+                    [sizeReqH $ fixedSize 16]
+                ]
+            , vstack (spacer:(labelV <$> coordsV)) `styleBasic`
+                [sizeReqW $ fixedSize 16]
             ]
-        , vstack (spacer:(labelV <$> coordsV)) `styleBasic`
-            [sizeReqW $ fixedSize 16]
-        ]
-    withRevCoords x = hstack_ [childSpacing_ 8]
-        [ vstack_ [childSpacing_ 8]
-            [ x
-            , hstack (spacer:(labelH <$> revCoordsH)) `styleBasic`
-                [sizeReqH $ fixedSize 16]
+        else x
+    withRevCoords x = if _amShowCoords
+        then hstack_ [childSpacing_ 8]
+            [ vstack_ [childSpacing_ 8]
+                [ x
+                , hstack (spacer:(labelH <$> revCoordsH)) `styleBasic`
+                    [sizeReqH $ fixedSize 16]
+                ]
+            , vstack (spacer:(labelV <$> revCoordsV)) `styleBasic`
+                [sizeReqW $ fixedSize 16]
             ]
-        , vstack (spacer:(labelV <$> revCoordsV)) `styleBasic`
-            [sizeReqW $ fixedSize 16]
-        ]
+        else x
     labelH x = label x `styleBasic` [sizeReqW $ fixedSize 47]
     labelV x = label x `styleBasic` [sizeReqH $ fixedSize 47]
     coordsH = ["a", "b", "c", "d", "e", "f", "g", "h"]

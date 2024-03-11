@@ -25,6 +25,7 @@ module Model.AppModel
     , tablebaseData
     , errorMessage
     , showLegal
+    , showCoords
     , autoQueen
     , boardRotated
     , responseThread
@@ -76,6 +77,7 @@ data AppModel = AppModel
     , _amTablebaseData :: TablebaseData
     , _amErrorMessage :: Maybe Text
     , _amShowLegal :: Bool
+    , _amShowCoords :: Bool
     , _amAutoQueen :: Bool
     , _amBoardRotated :: Bool
     , _amResponseThread :: Maybe ThreadId
@@ -110,6 +112,7 @@ initModel = AppModel
     , _amTablebaseData = defaultTablebaseData
     , _amErrorMessage = Nothing
     , _amShowLegal = True
+    , _amShowCoords = True
     , _amAutoQueen = False
     , _amBoardRotated = False
     , _amResponseThread = Nothing
