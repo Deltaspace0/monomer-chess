@@ -287,29 +287,54 @@ buildUI _ model@(AppModel{..}) = tree where
     (chessBoard, chessBoardR) = if _amShowEditMenu
         then (editBoard, editBoardR)
         else (gameBoard, gameBoardR)
-    gameBoard = dragboard_ 8 8 boardState checkerPath
+    gameBoard = withCoords $ makeBoard boardState
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
         , showLegalMoves_ _amShowLegal
         , onChange AppBoardChanged
         ]
-    gameBoardR = dragboard_ 8 8 boardStateReversed checkerPath
+    gameBoardR = withRevCoords $ makeBoard boardStateReversed
         [ checkerConfig [lightColor gray]
         , moveValidator $ validateMove model
         , dragIdOffset 500
         , showLegalMoves_ _amShowLegal
         , onChange AppBoardChanged
         ]
-    editBoard = dragboard_ 8 8 (fenData . fenBoardState) checkerPath
+    editBoard = withCoords $ makeBoard (fenData . fenBoardState)
         [ checkerConfig [lightColor gray, darkColor darkGray]
         , dragIdOffset 2000
         , onChange AppEditBoardChanged
         ]
-    editBoardR = dragboard_ 8 8 (fenData . fenBoardStateReversed) checkerPath
+    editBoardR = withRevCoords $ makeBoard (fenData . fenBoardStateReversed)
         [ checkerConfig [lightColor gray, darkColor darkGray]
         , dragIdOffset 3000
         , onChange AppEditBoardChanged
         ]
+    withCoords x = hstack_ [childSpacing_ 8]
+        [ vstack_ [childSpacing_ 8]
+            [ x
+            , hstack (spacer:(labelH <$> coordsH)) `styleBasic`
+                [sizeReqH $ fixedSize 16]
+            ]
+        , vstack (spacer:(labelV <$> coordsV)) `styleBasic`
+            [sizeReqW $ fixedSize 16]
+        ]
+    withRevCoords x = hstack_ [childSpacing_ 8]
+        [ vstack_ [childSpacing_ 8]
+            [ x
+            , hstack (spacer:(labelH <$> revCoordsH)) `styleBasic`
+                [sizeReqH $ fixedSize 16]
+            ]
+        , vstack (spacer:(labelV <$> revCoordsV)) `styleBasic`
+            [sizeReqW $ fixedSize 16]
+        ]
+    labelH x = label x `styleBasic` [sizeReqW $ fixedSize 47]
+    labelV x = label x `styleBasic` [sizeReqH $ fixedSize 47]
+    coordsH = ["a", "b", "c", "d", "e", "f", "g", "h"]
+    coordsV = ["8", "7", "6", "5", "4", "3", "2", "1"]
+    revCoordsH = ["h", "g", "f", "e", "d", "c", "b", "a"]
+    revCoordsV = ["1", "2", "3", "4", "5", "6", "7", "8"]
+    makeBoard field configs = dragboard_ 8 8 field checkerPath configs
     extraBoard = dragboardD_ 6 2 pieceWidgetData checkerPath
         [ checkerConfig [lightColor gray, darkColor darkGray]
         , moveValidator $ const False
