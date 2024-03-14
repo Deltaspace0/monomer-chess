@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Model.UCIOptions
@@ -12,6 +13,7 @@ module Model.UCIOptions
     , activeUciOptions
     , nextUciOptions
     , initUciOptions
+    , getChangedUciOptions
     , buildUciRequest
     , showCaption
     , showValue
@@ -72,6 +74,11 @@ initUciOptions options = UCIOptions
     { _uoActiveUciOptions = options
     , _uoNextUciOptions = options
     }
+
+getChangedUciOptions :: UCIOptions -> [OptionUCI]
+getChangedUciOptions UCIOptions{..} = result where
+    result = snd <$> filter (\(x, y) -> x /= y) optPairs
+    optPairs = zip _uoActiveUciOptions _uoNextUciOptions
 
 buildUciRequest :: OptionUCI -> String
 buildUciRequest opt = result where

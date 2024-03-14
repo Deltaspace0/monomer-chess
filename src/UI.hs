@@ -416,12 +416,17 @@ buildUI _ model@(AppModel{..}) = tree where
             ]
         , button "Apply for every UCI engine" AppDistributeUciDepth
         , separatorLine
-        , label "UCI options"
+        , zstack
+            [ label "UCI options"
+            , box_ [alignRight] $ button "Apply all" AppApplyOptionsUCI
+                `nodeEnabled` (uciOptionsChanged && isJust _uciRequestMVars)
+            ]
         , if null _uciRequestMVars
             then label "Not available (UCI is not loaded)"
             else uciOptionsPanel (uciData' . optionsUCI) $
                 fst $ fromJust _uciRequestMVars
         ]
+    uciOptionsChanged = not $ null $ getChangedUciOptions _uciOptionsUCI
     uciIndexEvent :: Int -> AppEvent
     uciIndexEvent _ = AppRunAnalysis
     uciData' :: Lens' AppModel UCIData

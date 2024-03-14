@@ -61,6 +61,7 @@ data AppEvent
     | AppSetCurrentEngineDepth Int (Maybe Text)
     | AppSetPrincipalVariations Int [(Text, Maybe Ply, Maybe Double)]
     | AppSetOptionsUCI Int UCIOptions
+    | AppApplyOptionsUCI
     | AppRunAnalysis
     | AppCompleteEval
     | AppAbortEval
@@ -120,6 +121,7 @@ handleEvent _ _ model event = case event of
     AppSetCurrentEngineDepth i v -> setCurrentEngineDepthHandle i v model
     AppSetPrincipalVariations i v -> setPrincipalVariationsHandle i v model
     AppSetOptionsUCI i v -> setOptionsUCIHandle i v model
+    AppApplyOptionsUCI -> applyOptionsUCIHandle model
     AppRunAnalysis -> runAnalysisHandle model
     AppCompleteEval -> completeEvalHandle model
     AppAbortEval -> abortEvalHandle model
@@ -601,6 +603,16 @@ setPrincipalVariationsHandle i v model@(AppModel{..}) = response where
 setOptionsUCIHandle :: Int -> UCIOptions -> EventHandle
 setOptionsUCIHandle i v model = response where
     response = [Model $ model & uciData . ix i . optionsUCI .~ v]
+
+applyOptionsUCIHandle :: EventHandle
+applyOptionsUCIHandle model@(AppModel{..}) = response where
+    response = (Model $ updateModel model):optRequests
+    updateModel = uciData . ix _amUciIndex . optionsUCI .~ newOpts
+    optRequests = makeOptRequest <$> getChangedUciOptions _uciOptionsUCI
+    makeOptRequest = Event . AppSendEngineRequest . buildUciRequest
+    newOpts = _uciOptionsUCI {_uoActiveUciOptions = nextOptions}
+    nextOptions = _uoNextUciOptions _uciOptionsUCI
+    UCIData{..} = _amUciData!!_amUciIndex
 
 runAnalysisHandle :: EventHandle
 runAnalysisHandle model@(AppModel{..}) = response where
