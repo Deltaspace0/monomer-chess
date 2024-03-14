@@ -33,9 +33,10 @@ module Model.UCI
 
 import Control.Applicative
 import Control.Concurrent
-import Control.Lens
+import Control.Lens hiding ((.=))
 import Control.Exception
 import Control.Monad
+import Data.Aeson
 import Data.IORef
 import Data.List (elemIndex)
 import Data.Maybe
@@ -85,6 +86,37 @@ data UCIData = UCIData
     , _uciEngineLogChan :: Maybe (Chan UCILog)
     , _uciOptionsUCI :: UCIOptions
     } deriving (Eq, Show)
+
+instance FromJSON UCIData where
+    parseJSON = withObject "UCIData" $ \v -> UCIData
+        <$> v .: "engine_index"
+        <*> v .: "engine_next_index"
+        <*> v .: "engine_live_report"
+        <*> v .: "engine_graph_builder"
+        <*> v .: "engine_path"
+        <*> pure False
+        <*> v .: "engine_depth"
+        <*> v .: "engine_nodes"
+        <*> v .: "engine_depth_or_nodes"
+        <*> pure Nothing
+        <*> pure []
+        <*> pure Nothing
+        <*> pure Nothing
+        <*> pure Nothing
+        <*> v .: "options_uci"
+
+instance ToJSON UCIData where
+    toJSON UCIData{..} = object
+        [ "engine_index" .= _uciEngineIndex
+        , "engine_next_index" .= _uciEngineNextIndex
+        , "engine_live_report" .= _uciEngineLiveReport
+        , "engine_graph_builder" .= _uciEngineGraphBuilder
+        , "engine_path" .= _uciEnginePath
+        , "engine_depth" .= _uciEngineDepth
+        , "engine_nodes" .= _uciEngineNodes
+        , "engine_depth_or_nodes" .= _uciEngineDepthOrNodes
+        , "options_uci" .= _uciOptionsUCI
+        ]
 
 instance Show (MVar a) where
     show _ = ""

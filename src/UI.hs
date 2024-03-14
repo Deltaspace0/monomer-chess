@@ -365,8 +365,12 @@ buildUI _ model@(AppModel{..}) = tree where
         else button "Edit position" $ AppSetEditMenu True)
             `nodeEnabled` not calculatingResponse
     noLegalMoves = null $ legalPlies _amChessPosition
-    uciPanel = vstack_ [childSpacing_ 16]
-        [ zstack
+    uciPanel = vstack'
+        [ hgrid'
+            [ button "Load uci.json" AppUciLoadFromFile
+            , button "Save" AppUciSaveToFile
+            ]
+        , zstack
             [ label "UCI settings"
             , box_ [alignRight] $ hstack'
                 [ textDropdown_ uciIndex [0..length _amUciData-1]
@@ -376,12 +380,12 @@ buildUI _ model@(AppModel{..}) = tree where
                 , button "New" AppUciNewSlot
                 ]
             ]
-        , hstack_ [childSpacing_ 16]
+        , hstack'
             [ label "Path: "
             , textField $ uciData' . enginePath
             , if _uciEngineLoading
-                then button "Wait" AppLoadEngine `nodeEnabled` False
-                else button "Load" AppLoadEngine
+                then button "Wait" (AppLoadEngine 0) `nodeEnabled` False
+                else button "Load" $ AppLoadEngine _amUciIndex
             ]
         , if null _uciRequestMVars
             then label "UCI engine is not loaded"

@@ -10,18 +10,21 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Lens
 import Control.Monad
+import Data.Aeson
+import Data.Aeson.Encode.Pretty
 import Data.IORef
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
 import Data.Text.Encoding
 import Data.Tree (Tree(..))
-import Game.Chess
+import Game.Chess hiding (file)
 import Game.Chess.PGN
 import Monomer
 import Monomer.Dragboard.DragboardEvent (DragId(..))
 import System.Directory
-import Text.Megaparsec
+import Text.Megaparsec hiding (try)
 import TextShow
+import qualified Data.ByteString.Lazy.UTF8 as BLU
 
 import Model.AppModel
 
@@ -53,7 +56,8 @@ data AppEvent
     | AppApplyEditChanges
     | AppClearEditBoard
     | AppUpdateFEN
-    | AppLoadEngine
+    | AppLoadEngine Int
+    | AppSetUciData [UCIData]
     | AppSetEngineLoading Int Bool
     | AppSetRequestMVars Int (Maybe (MVar String, MVar Position))
     | AppSetBestMoveMVars Int (Maybe (MVar String, MVar ()))
@@ -75,6 +79,8 @@ data AppEvent
     | AppRecordUCILogsChanged Bool
     | AppUciNewSlot
     | AppUciCloneSlot
+    | AppUciLoadFromFile
+    | AppUciSaveToFile
     | AppDistributeUciDepth
     | AppSetTablebaseData TablebaseData
     | AppGraphClicked (Double, Double)
@@ -114,7 +120,8 @@ handleEvent _ _ model event = case event of
     AppApplyEditChanges -> applyEditChangesHandle model
     AppClearEditBoard -> clearEditBoardHandle model
     AppUpdateFEN -> updateFenHandle model
-    AppLoadEngine -> loadEngineHandle model
+    AppLoadEngine i -> loadEngineHandle i model
+    AppSetUciData v -> setUciDataHandle v model
     AppSetEngineLoading i v -> setEngineLoadingHandle i v model
     AppSetRequestMVars i v -> setRequestMVarsHandle i v model
     AppSetBestMoveMVars i v -> setBestMoveMVarsHandle i v model
@@ -136,6 +143,8 @@ handleEvent _ _ model event = case event of
     AppRecordUCILogsChanged v -> recordUCILogsChangedHandle v model
     AppUciNewSlot -> uciNewSlotHandle model
     AppUciCloneSlot -> uciCloneSlotHandle model
+    AppUciLoadFromFile -> uciLoadFromFileHandle model
+    AppUciSaveToFile -> uciSaveToFileHandle model
     AppDistributeUciDepth -> distributeUciDepthHandle model
     AppSetTablebaseData v -> setTablebaseDataHandle v model
     AppGraphClicked v -> graphClickedHandle v model
@@ -534,18 +543,25 @@ updateFenHandle model@(AppModel{..}) = response where
     response = [Model $ model & forsythEdwards .~ newFEN]
     newFEN = pack $ toFEN $ fromJust $ fromFEN $ getFenString _amFenData
 
-loadEngineHandle :: EventHandle
-loadEngineHandle AppModel{..} = [Producer producerHandler] where
+loadEngineHandle :: Int -> EventHandle
+loadEngineHandle i AppModel{..} = [Producer producerHandler] where
     producerHandler raiseEvent = loadUciEngine currentUciData $ f raiseEvent
     f raiseEvent event = raiseEvent $ case event of
         EventReportError v -> AppSetErrorMessage $ Just v
-        EventSetEngineLoading v -> AppSetEngineLoading _amUciIndex v
-        EventSetRequestMVars v -> AppSetRequestMVars _amUciIndex v
-        EventSetBestMoveMVars v -> AppSetBestMoveMVars _amUciIndex v
-        EventSetCurrentDepth v -> AppSetCurrentEngineDepth _amUciIndex v
-        EventSetPV v -> AppSetPrincipalVariations _amUciIndex v
-        EventSetOptionsUCI v -> AppSetOptionsUCI _amUciIndex v
-    currentUciData = _amUciData!!_amUciIndex
+        EventSetEngineLoading v -> AppSetEngineLoading i v
+        EventSetRequestMVars v -> AppSetRequestMVars i v
+        EventSetBestMoveMVars v -> AppSetBestMoveMVars i v
+        EventSetCurrentDepth v -> AppSetCurrentEngineDepth i v
+        EventSetPV v -> AppSetPrincipalVariations i v
+        EventSetOptionsUCI v -> AppSetOptionsUCI i v
+    currentUciData = _amUciData!!i
+
+setUciDataHandle :: [UCIData] -> EventHandle
+setUciDataHandle v model =
+    [ Model $ model
+        & uciData .~ v
+        & uciIndex .~ 0
+    ]
 
 setEngineLoadingHandle :: Int -> Bool -> EventHandle
 setEngineLoadingHandle i v model = response where
@@ -792,6 +808,31 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
         & engineLogChan .~ _uciEngineLogChan
     newEngineIndex = length _amUciData
     UCIData{..} = _amUciData!!_amUciIndex
+
+uciLoadFromFileHandle :: EventHandle
+uciLoadFromFileHandle AppModel{..} = [Producer producerHandler] where
+    producerHandler raiseEvent = do
+        let handler = const $ pure "" :: SomeException -> IO String
+        file <- catch (readFile "uci.json") handler
+        let contents = BLU.fromString file
+            parameters = decode contents :: Maybe [UCIData]
+            badData = null parameters || null (fromJust parameters)
+        raiseEvent $ if badData
+            then AppSetErrorMessage $ Just "Can't load from uci.json"
+            else AppSetUciData $ fromJust parameters
+        unless badData $ forM_ [0..length (fromJust parameters)-1] $ \i ->
+            raiseEvent $ AppLoadEngine i
+
+uciSaveToFileHandle :: EventHandle
+uciSaveToFileHandle AppModel{..} = [Producer producerHandler] where
+    producerHandler raiseEvent = do
+        let converted = encodePretty _amUciData
+            contents = BLU.toString converted
+            operation = writeFile "uci.json" contents
+        result <- try operation :: IO (Either SomeException ())
+        case result of
+            Left _ -> raiseEvent $ AppSetErrorMessage $ Just "Can't save"
+            Right _ -> return ()
 
 distributeUciDepthHandle :: EventHandle
 distributeUciDepthHandle model@(AppModel{..}) = response where

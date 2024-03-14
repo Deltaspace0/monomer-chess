@@ -21,7 +21,10 @@ module Model.UCIOptions
     , parseUciOption
     ) where
 
-import Control.Lens
+import Control.Lens hiding ((.=))
+import Data.Aeson
+import Data.Aeson.Types
+import Data.Foldable
 import Data.List (elemIndex, elemIndices)
 import Data.Maybe
 import Data.Text (pack, unpack, Text)
@@ -56,6 +59,54 @@ data UCIOptions = UCIOptions
     , _uoNextUciOptions :: [OptionUCI]
     } deriving (Eq, Show)
 
+instance FromJSON OptionUCI where
+    parseJSON = withObject "OptionUCI" $ \v -> mconcat
+        [ SpinUCI
+            <$> v .: "spin_caption"
+            <*> v .: "spin_value"
+            <*> v .: "spin_min_value"
+            <*> v .: "spin_max_value"
+        , ComboUCI
+            <$> v .: "combo_caption"
+            <*> v .: "combo_value"
+            <*> v .: "combo_values"
+        , CheckUCI
+            <$> v .: "check_caption"
+            <*> v .: "check_value"
+        , StringUCI
+            <$> v .: "string_caption"
+            <*> v .: "string_value"
+        , ButtonUCI
+            <$> v .: "button_caption"
+        ]
+
+instance ToJSON OptionUCI where
+    toJSON SpinUCI{..} = object
+        [ "spin_caption" .= _spuSpinCaption
+        , "spin_value" .= _spuSpinValue
+        , "spin_min_value" .= _spuSpinMinValue
+        , "spin_max_value" .= _spuSpinMaxValue
+        ]
+    toJSON ComboUCI{..} = object
+        [ "combo_caption" .= _couComboCaption
+        , "combo_value" .= _couComboValue
+        , "combo_values" .= _couComboValues
+        ]
+    toJSON CheckUCI{..} = object
+        [ "check_caption" .= _chuCheckCaption
+        , "check_value" .= _chuCheckValue
+        ]
+    toJSON StringUCI{..} = object
+        [ "string_caption" .= _stuStringCaption
+        , "string_value" .= _stuStringValue
+        ]
+    toJSON ButtonUCI{..} = object
+        [ "button_caption" .= _buuButtonCaption
+        ]
+
+instance ToJSON UCIOptions where
+    toJSON UCIOptions{..} = toJSON _uoNextUciOptions
+
 spinValue :: Lens' OptionUCI Int
 spinValue = lens _spuSpinValue (\x v -> x {_spuSpinValue = v})
 
@@ -75,6 +126,10 @@ initUciOptions options = UCIOptions
     { _uoActiveUciOptions = options
     , _uoNextUciOptions = options
     }
+
+instance FromJSON UCIOptions where
+    parseJSON = withArray "UCIOptions" $
+        fmap (initUciOptions . toList) . mapM parseJSON
 
 getChangedUciOptions :: UCIOptions -> [OptionUCI]
 getChangedUciOptions UCIOptions{..} = result where

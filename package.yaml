@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/Delt
 
 dependencies:
 - aeson
+- aeson-pretty
 - base >= 4.7 && < 5
 - chessIO
 - containers
@@ -36,6 +37,7 @@ dependencies:
 - split
 - text
 - text-show
+- utf8-string
 - wreq
 
 default-extensions:
