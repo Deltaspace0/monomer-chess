@@ -602,7 +602,8 @@ setPrincipalVariationsHandle i v model@(AppModel{..}) = response where
 
 setOptionsUCIHandle :: Int -> UCIOptions -> EventHandle
 setOptionsUCIHandle i v model = response where
-    response = [Model $ model & uciData . ix i . optionsUCI .~ v]
+    response = [Model $ model & uciData . ix i . optionsUCI %~ f]
+    f = mergeUciOptions v
 
 applyOptionsUCIHandle :: EventHandle
 applyOptionsUCIHandle model@(AppModel{..}) = response where

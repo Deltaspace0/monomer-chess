@@ -14,6 +14,7 @@ module Model.UCIOptions
     , nextUciOptions
     , initUciOptions
     , getChangedUciOptions
+    , mergeUciOptions
     , buildUciRequest
     , showCaption
     , showValue
@@ -79,6 +80,28 @@ getChangedUciOptions :: UCIOptions -> [OptionUCI]
 getChangedUciOptions UCIOptions{..} = result where
     result = snd <$> filter (\(x, y) -> x /= y) optPairs
     optPairs = zip _uoActiveUciOptions _uoNextUciOptions
+
+mergeUciOptions :: UCIOptions -> UCIOptions -> UCIOptions
+mergeUciOptions newOpts oldOpts = resultOpts where
+    resultOpts = UCIOptions
+        { _uoActiveUciOptions = activeNewOpts
+        , _uoNextUciOptions = zipWith mergeOpt activeNewOpts nextOldOpts
+        }
+    activeNewOpts = _uoActiveUciOptions newOpts
+    nextOldOpts = _uoNextUciOptions oldOpts <> (repeat $ ButtonUCI "")
+    mergeOpt x@(SpinUCI c1 _ a b) (SpinUCI c2 v _ _) = if c1 == c2
+        then SpinUCI c1 v a b
+        else x
+    mergeOpt x@(ComboUCI c1 _ xs) (ComboUCI c2 v _) = if c1 == c2
+        then ComboUCI c1 v xs
+        else x
+    mergeOpt x@(CheckUCI c1 _) (CheckUCI c2 v) = if c1 == c2
+        then CheckUCI c1 v
+        else x
+    mergeOpt x@(StringUCI c1 _) (StringUCI c2 v) = if c1 == c2
+        then StringUCI c1 v
+        else x
+    mergeOpt x _ = x
 
 buildUciRequest :: OptionUCI -> String
 buildUciRequest opt = result where
