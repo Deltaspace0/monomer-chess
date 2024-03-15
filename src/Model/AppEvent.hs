@@ -557,11 +557,18 @@ loadEngineHandle i AppModel{..} = [Producer producerHandler] where
     currentUciData = _amUciData!!i
 
 setUciDataHandle :: [UCIData] -> EventHandle
-setUciDataHandle v model =
-    [ Model $ model
-        & uciData .~ v
-        & uciIndex .~ 0
-    ]
+setUciDataHandle v model@(AppModel{..}) = response where
+    response =
+        [ Model $ model
+            & uciData .~ newUciData
+            & uciIndex .~ 0
+        ]
+    newUciData = zipWith f v $ _amUciData <> repeat defaultUciData
+    f x UCIData{..} = x
+        { _uciRequestMVars = _uciRequestMVars
+        , _uciBestMoveMVars = _uciBestMoveMVars
+        , _uciEngineLogChan = _uciEngineLogChan
+        }
 
 setEngineLoadingHandle :: Int -> Bool -> EventHandle
 setEngineLoadingHandle i v model = response where
@@ -810,7 +817,7 @@ uciCloneSlotHandle model@(AppModel{..}) = response where
     UCIData{..} = _amUciData!!_amUciIndex
 
 uciLoadFromFileHandle :: EventHandle
-uciLoadFromFileHandle AppModel{..} = [Producer producerHandler] where
+uciLoadFromFileHandle _ = [Producer producerHandler] where
     producerHandler raiseEvent = do
         let handler = const $ pure "" :: SomeException -> IO String
         file <- catch (readFile "uci.json") handler
