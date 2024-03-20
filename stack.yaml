@@ -43,7 +43,7 @@ packages:
 extra-deps:
 - chessIO-0.9.3.1
 - git: https://github.com/Deltaspace0/monomer.git
-  commit: 1e505384841dd8228b95c47e4c3ea5a52d015e79
+  commit: 25d1b76322725c75e474a6309b99db8443e0abaf
 - nanovg-0.8.1.0
 - git: https://github.com/Deltaspace0/monomer-widgets.git
   commit: c6698cd5131be7df94d4d94b4b120ecdb587ffa6
